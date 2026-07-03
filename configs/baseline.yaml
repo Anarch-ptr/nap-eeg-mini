@@ -1,0 +1,31 @@
+seed: 0
+
+data:
+  num_trials: 512
+  num_channels: 22
+  num_samples: 1000
+  num_classes: 4
+  train_ratio: 0.8
+
+model:
+  name: eegnet
+  f1: 8
+  d: 2
+  f2: 16
+  kernel_length: 64
+  dropout: 0.25
+
+training:
+  batch_size: 32
+  epochs: 3
+  learning_rate: 0.001
+
+audit:
+  enabled: true
+  artifact_channels: [0, 1, 2, 3]
+
+output:
+  table_dir: results/tables
+  training_history_file: training_history.csv
+  audit_summary_file: audit_summary.csv
+  
