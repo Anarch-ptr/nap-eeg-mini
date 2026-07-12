@@ -1,4 +1,4 @@
-"""Unit tests for the BCI Competition IV 2a data utilities."""
+﻿"""Unit tests for the BCI Competition IV 2a data utilities."""
 
 from __future__ import annotations
 
@@ -92,5 +92,4 @@ class TestBCI2ALoaderValidation(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()git add scripts/inspect_bci2a.py
-git add tests/test_bci2a_data.py
+    unittest.main()
