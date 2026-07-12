@@ -14,11 +14,12 @@ import os
 import torch
 import torch.nn as nn
 import yaml
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, TensorDataset, random_split
 
 from src.audit import evaluate_channel_masking
 from src.audit import summarize_channel_masking_audit
 from src.datasets import SyntheticEEGDataset
+from src.data import load_bci2a_subject
 from src.evaluate import evaluate_classifier
 from src.models.eegnet import EEGNet
 
@@ -99,38 +100,118 @@ def train_one_epoch(model, dataloader, criterion, optimizer, device):
 
 def build_dataloaders(config):
     """
-    Build train and validation dataloaders from config.
+    Build training and validation dataloaders.
 
-    Parameters
-    ----------
-    config : dict
-        Configuration dictionary.
-
-    Returns
-    -------
-    tuple
-        Train and validation dataloaders.
+    Synthetic data and BCI Competition IV 2a are supported.
+    For BCI2a, only the official training session is split into
+    training and validation subsets. The official test session
+    remains untouched.
     """
 
     data_config = config["data"]
     training_config = config["training"]
 
-    dataset = SyntheticEEGDataset(
-        num_trials=data_config["num_trials"],
-        num_channels=data_config["num_channels"],
-        num_samples=data_config["num_samples"],
-        num_classes=data_config["num_classes"],
-        seed=config["seed"],
-    )
+    dataset_name = data_config.get("name", "synthetic").lower()
+    seed = config["seed"]
+    train_ratio = data_config.get("train_ratio", 0.8)
 
-    train_size = int(data_config["train_ratio"] * len(dataset))
-    val_size = len(dataset) - train_size
+    if dataset_name == "synthetic":
+        dataset = SyntheticEEGDataset(
+            num_trials=data_config["num_trials"],
+            num_channels=data_config["num_channels"],
+            num_samples=data_config["num_samples"],
+            num_classes=data_config["num_classes"],
+            seed=seed,
+        )
 
-    train_dataset, val_dataset = random_split(
-        dataset,
-        [train_size, val_size],
-        generator=torch.Generator().manual_seed(config["seed"]),
-    )
+        train_size = int(train_ratio * len(dataset))
+        val_size = len(dataset) - train_size
+
+        train_dataset, val_dataset = random_split(
+            dataset,
+            [train_size, val_size],
+            generator=torch.Generator().manual_seed(seed),
+        )
+
+        print("Dataset source: synthetic EEG")
+        print(f"Training trials: {train_size}")
+        print(f"Validation trials: {val_size}")
+
+    elif dataset_name in {"bci2a", "bci_iv_2a"}:
+        subject_data = load_bci2a_subject(
+            subject_id=data_config["subject_id"],
+            data_dir=data_config.get("data_dir", "data/moabb"),
+            fmin=data_config.get("fmin", 8.0),
+            fmax=data_config.get("fmax", 32.0),
+            tmin=data_config.get("tmin", 0.0),
+            tmax=data_config.get("tmax", 4.0),
+        )
+
+        x = torch.from_numpy(subject_data.x_train).float()
+        y = torch.from_numpy(subject_data.y_train).long()
+
+        num_trials = x.shape[0]
+        train_size = int(train_ratio * num_trials)
+        val_size = num_trials - train_size
+
+        if train_size <= 0 or val_size <= 0:
+            raise ValueError(
+                f"Invalid train/validation split: "
+                f"train={train_size}, val={val_size}"
+            )
+
+        generator = torch.Generator().manual_seed(seed)
+        shuffled_indices = torch.randperm(
+            num_trials,
+            generator=generator,
+        )
+
+        train_indices = shuffled_indices[:train_size]
+        val_indices = shuffled_indices[train_size:]
+
+        x_train = x[train_indices]
+        y_train = y[train_indices]
+
+        x_val = x[val_indices]
+        y_val = y[val_indices]
+
+        if data_config.get("normalize", True):
+            channel_mean = x_train.mean(
+                dim=(0, 2),
+                keepdim=True,
+            )
+            channel_std = x_train.std(
+                dim=(0, 2),
+                keepdim=True,
+            ).clamp_min(1e-6)
+
+            x_train = (x_train - channel_mean) / channel_std
+            x_val = (x_val - channel_mean) / channel_std
+
+        train_dataset = TensorDataset(x_train, y_train)
+        val_dataset = TensorDataset(x_val, y_val)
+
+        # The model is built after this function, so update the
+        # dimensions using the actual loaded data.
+        data_config["num_channels"] = int(x.shape[1])
+        data_config["num_samples"] = int(x.shape[2])
+        data_config["num_classes"] = 4
+
+        print("Dataset source: BCI Competition IV 2a")
+        print(f"Subject: A{data_config['subject_id']:02d}")
+        print(f"Official train shape: {tuple(subject_data.x_train.shape)}")
+        print(f"Official test shape:  {tuple(subject_data.x_test.shape)}")
+        print(f"Training trials: {train_size}")
+        print(f"Validation trials: {val_size}")
+        print(f"Channels: {data_config['num_channels']}")
+        print(f"Samples per trial: {data_config['num_samples']}")
+        print(f"Sampling rate: {subject_data.sampling_rate}")
+        print("Official test session is not used during training.")
+
+    else:
+        raise ValueError(
+            f"Unsupported dataset name: {dataset_name}"
+        )
 
     train_loader = DataLoader(
         train_dataset,
@@ -346,9 +427,11 @@ def main():
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(
-        model.parameters(),
-        lr=config["training"]["learning_rate"],
-    )
+    model.parameters(),
+    lr=config["training"]["learning_rate"],
+    weight_decay=config["training"].get("weight_decay", 0.0),
+)
+
 
     print(f"Using device: {device}")
     print(f"Using config: {args.config}")

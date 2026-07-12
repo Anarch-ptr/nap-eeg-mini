@@ -1,0 +1,37 @@
+seed: 42
+
+data:
+  name: bci2a
+  subject_id: 1
+  data_dir: data/moabb
+  fmin: 8.0
+  fmax: 32.0
+  tmin: 0.0
+  tmax: 4.0
+  train_ratio: 0.8
+  num_channels: 22
+  num_samples: 1001
+  num_classes: 4
+
+model:
+  name: eegnet
+  f1: 8
+  d: 2
+  f2: 16
+  kernel_length: 64
+  dropout: 0.25
+
+training:
+  batch_size: 32
+  epochs: 50
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+audit:
+  enabled: false
+  artifact_channels: [0, 1, 2, 3]
+
+output:
+  table_dir: results/bci2a_eegnet_baseline/subject_01
+  training_history_file: metrics.csv
+  audit_summary_file: audit_summary.csv
