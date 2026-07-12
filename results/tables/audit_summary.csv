@@ -1,0 +1,2 @@
+masked_channels,clean_accuracy,masked_accuracy,accuracy_drop,relative_drop,masked_loss
+"[0, 1, 2, 3]",1.0,1.0,0.0,0.0,0.138849013060042
