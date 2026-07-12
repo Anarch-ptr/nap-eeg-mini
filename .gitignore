@@ -253,8 +253,11 @@ results/tmp/
 .DS_Store
 Thumbs.db
 
-# Keep report-ready result tables and  figures
-!results/table/*.csv
+# Keep report-ready result tables and figures
+!results/
+!results/tables/
+!results/tables/*.csv
+!results/figures/
 !results/figures/*.png
 !results/figures/*.jpg
 !results/figures/*.jpeg
