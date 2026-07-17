@@ -238,6 +238,11 @@ weights/
 wandb/
 runs/
 logs/
+results/bci2a_*/
+results/**/best_validation_checkpoint.pt
+results/**/run_summary.json
+results/**/split_indices.json
+results/**/resolved_config.yaml
 
 # Temporary results
 results/raw/
