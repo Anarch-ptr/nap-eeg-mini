@@ -22,7 +22,7 @@ def main() -> None:
     subject_data = load_bci2a_subject(subject_id=1)
 
     print()
-    print("BCI Competition IV 2a — Subject 1")
+    print("BCI Competition IV 2a - Subject 1")
     print("----------------------------------")
     print(f"Train shape:         {subject_data.x_train.shape}")
     print(f"Test shape:          {subject_data.x_test.shape}")

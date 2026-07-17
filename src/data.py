@@ -7,9 +7,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from moabb import set_download_dir
-from moabb.datasets import BNCI2014_001
-from moabb.paradigms import MotorImagery
 
 
 BCI2A_LABEL_TO_INDEX = {
@@ -36,6 +33,19 @@ class BCI2ASubjectData:
     sampling_rate: float
 
 
+@dataclass
+class BCI2ASessionSplit:
+    """Official train/test session split for BCI Competition IV 2a."""
+
+    x_train: np.ndarray
+    y_train: np.ndarray
+    x_test: np.ndarray
+    y_test: np.ndarray
+
+    train_metadata: pd.DataFrame
+    test_metadata: pd.DataFrame
+
+
 def encode_bci2a_labels(labels: np.ndarray) -> np.ndarray:
     """Convert MOABB string labels into integer class indices."""
 
@@ -52,6 +62,68 @@ def encode_bci2a_labels(labels: np.ndarray) -> np.ndarray:
     )
 
     return encoded
+
+
+def split_bci2a_sessions(
+    x: np.ndarray,
+    y: np.ndarray,
+    metadata: pd.DataFrame,
+) -> BCI2ASessionSplit:
+    """Split BCI2a arrays into official train and test sessions.
+
+    Parameters
+    ----------
+    x:
+        Trial array with the trial dimension first.
+    y:
+        Label array with one label per trial.
+    metadata:
+        Trial metadata containing a ``session`` column.
+
+    Returns
+    -------
+    BCI2ASessionSplit
+        Copies of arrays and metadata for ``0train`` and ``1test``.
+    """
+
+    if "session" not in metadata.columns:
+        raise ValueError("metadata must contain a 'session' column.")
+
+    if x.shape[0] != len(y) or x.shape[0] != len(metadata):
+        raise ValueError(
+            "x, y, and metadata must contain the same number of trials."
+        )
+
+    session_names = metadata["session"].astype(str)
+    expected_sessions = {"0train", "1test"}
+    observed_sessions = set(session_names.unique().tolist())
+    unknown_sessions = observed_sessions - expected_sessions
+
+    if unknown_sessions:
+        raise RuntimeError(
+            f"Unexpected BCI IV 2a sessions: {sorted(unknown_sessions)}"
+        )
+
+    train_mask = (session_names == "0train").to_numpy()
+    test_mask = (session_names == "1test").to_numpy()
+
+    if not train_mask.any():
+        raise RuntimeError("No trials found for session '0train'.")
+
+    if not test_mask.any():
+        raise RuntimeError("No trials found for session '1test'.")
+
+    if np.any(train_mask & test_mask):
+        raise RuntimeError("Train and test session masks overlap.")
+
+    return BCI2ASessionSplit(
+        x_train=np.array(x[train_mask], copy=True),
+        y_train=np.array(y[train_mask], copy=True),
+        x_test=np.array(x[test_mask], copy=True),
+        y_test=np.array(y[test_mask], copy=True),
+        train_metadata=metadata.loc[train_mask].copy().reset_index(drop=True),
+        test_metadata=metadata.loc[test_mask].copy().reset_index(drop=True),
+    )
 
 
 def load_bci2a_subject(
@@ -108,6 +180,10 @@ def load_bci2a_subject(
     resolved_data_dir = Path(data_dir).resolve()
     resolved_data_dir.mkdir(parents=True, exist_ok=True)
 
+    from moabb import set_download_dir
+    from moabb.datasets import BNCI2014_001
+    from moabb.paradigms import MotorImagery
+
     set_download_dir(str(resolved_data_dir))
 
     dataset = BNCI2014_001()
@@ -131,54 +207,41 @@ def load_bci2a_subject(
     x = epochs.get_data(copy=True).astype(np.float32)
     y = encode_bci2a_labels(string_labels)
 
-    session_names = metadata["session"].astype(str)
+    session_split = split_bci2a_sessions(
+        x=x,
+        y=y,
+        metadata=metadata,
+    )
 
-    train_mask = session_names == "0train"
-    test_mask = session_names == "1test"
-
-    if not train_mask.any():
-        raise RuntimeError("No trials found for session '0train'.")
-
-    if not test_mask.any():
-        raise RuntimeError("No trials found for session '1test'.")
-
-    x_train = x[train_mask.to_numpy()]
-    y_train = y[train_mask.to_numpy()]
-
-    x_test = x[test_mask.to_numpy()]
-    y_test = y[test_mask.to_numpy()]
-
-    train_metadata = metadata.loc[train_mask].reset_index(drop=True)
-    test_metadata = metadata.loc[test_mask].reset_index(drop=True)
-
-    if x_train.shape[0] != 288:
+    if session_split.x_train.shape[0] != 288:
         raise RuntimeError(
-            f"Expected 288 training trials, got {x_train.shape[0]}"
+            "Expected 288 training trials, got "
+            f"{session_split.x_train.shape[0]}"
         )
 
-    if x_test.shape[0] != 288:
+    if session_split.x_test.shape[0] != 288:
         raise RuntimeError(
-            f"Expected 288 test trials, got {x_test.shape[0]}"
+            f"Expected 288 test trials, got {session_split.x_test.shape[0]}"
         )
 
-    if x_train.shape[1] != 22 or x_test.shape[1] != 22:
+    if session_split.x_train.shape[1] != 22 or session_split.x_test.shape[1] != 22:
         raise RuntimeError(
             "Expected 22 EEG channels for BCI Competition IV 2a."
         )
 
-    if not np.isfinite(x_train).all():
+    if not np.isfinite(session_split.x_train).all():
         raise RuntimeError("Training data contains NaN or Inf values.")
 
-    if not np.isfinite(x_test).all():
+    if not np.isfinite(session_split.x_test).all():
         raise RuntimeError("Test data contains NaN or Inf values.")
 
     return BCI2ASubjectData(
-        x_train=x_train,
-        y_train=y_train,
-        x_test=x_test,
-        y_test=y_test,
-        train_metadata=train_metadata,
-        test_metadata=test_metadata,
+        x_train=session_split.x_train,
+        y_train=session_split.y_train,
+        x_test=session_split.x_test,
+        y_test=session_split.y_test,
+        train_metadata=session_split.train_metadata,
+        test_metadata=session_split.test_metadata,
         channel_names=list(epochs.ch_names),
         sampling_rate=float(epochs.info["sfreq"]),
     )
