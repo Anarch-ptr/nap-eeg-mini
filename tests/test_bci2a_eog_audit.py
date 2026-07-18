@@ -16,7 +16,9 @@ from scripts.run_bci2a_eog_only import save_eog_summary
 from src.data import BCI2AEOGSubjectData
 from src.data import _add_bci2a_trial_identity
 from src.data import _validate_bci2a_eeg_eog_alignment
+from src.data import temporal_window_sample_bounds
 from src.train import build_dataloaders
+from src.train import deterministic_label_shuffle
 from src.evaluate import evaluate_classifier_detailed
 
 
@@ -68,6 +70,8 @@ def make_eog_subject(samples: int = 64) -> BCI2AEOGSubjectData:
         channel_types=["eog", "eog", "eog"],
         sampling_rate=250.0,
         subject_id=1,
+        epoch_tmin=0.0,
+        epoch_tmax=4.0,
     )
 
 
@@ -180,6 +184,12 @@ class TestEOGTrainingPath(unittest.TestCase):
                 "experiment": config["experiment"],
                 "subject": 1,
                 "seed": 42,
+                "control_type": "none",
+                "shuffle_seed": None,
+                "window_name": "full",
+                "epoch_tmin": 0.0,
+                "epoch_tmax": 4.0,
+                "num_samples": 64,
                 "modality": "eog",
                 "channels": 3,
                 "channel_names": ["EOG1", "EOG2", "EOG3"],
@@ -232,6 +242,53 @@ class TestDetailedEvaluation(unittest.TestCase):
         self.assertEqual(metrics["per_class_recall"], [1.0, 1.0, 0.0, 1.0])
         self.assertEqual(metrics["confusion_matrix"][2], [0, 1, 0, 0])
         self.assertAlmostEqual(metrics["macro_f1"], 2.0 / 3.0)
+
+
+class TestTemporalAndShuffleControls(unittest.TestCase):
+    def test_seconds_convert_to_inclusive_sample_indices(self) -> None:
+        self.assertEqual(
+            temporal_window_sample_bounds(0.0, 1.0, 0.0, 250.0, 1001),
+            (0, 250),
+        )
+        self.assertEqual(
+            temporal_window_sample_bounds(1.5, 2.5, 0.0, 250.0, 1001),
+            (375, 625),
+        )
+        self.assertEqual(
+            temporal_window_sample_bounds(3.0, 4.0, 0.0, 250.0, 1001),
+            (750, 1000),
+        )
+
+    def test_temporal_condition_has_same_crop_for_all_splits(self) -> None:
+        subject = make_eog_subject(samples=251)
+        subject.epoch_tmax = 1.0
+        with tempfile.TemporaryDirectory() as output_dir:
+            config = make_eog_config(output_dir)
+            config["data"]["tmin"] = 0.0
+            config["data"]["tmax"] = 1.0
+            with patch("src.train.load_bci2a_eog_subject", return_value=subject):
+                bundle = build_dataloaders(config)
+            for loader in (bundle.train_loader, bundle.val_loader, bundle.test_loader):
+                x, y = loader.dataset.tensors
+                self.assertEqual(x.shape[1:], (3, 251))
+                self.assertEqual(len(x), len(y))
+                self.assertEqual(len(loader.dataset.tensors), 2)
+
+    def test_full_epoch_default_remains_unchanged(self) -> None:
+        subject = make_eog_subject(samples=1001)
+        with tempfile.TemporaryDirectory() as output_dir:
+            config = make_eog_config(output_dir)
+            with patch("src.train.load_bci2a_eog_subject", return_value=subject):
+                bundle = build_dataloaders(config)
+            self.assertEqual(bundle.train_loader.dataset.tensors[0].shape[2], 1001)
+
+    def test_label_shuffle_is_deterministic_and_preserves_multiset(self) -> None:
+        labels = torch.tensor([0, 1, 2, 3] * 8)
+        first = deterministic_label_shuffle(labels, 20260718)
+        second = deterministic_label_shuffle(labels, 20260718)
+        torch.testing.assert_close(first, second)
+        self.assertFalse(torch.equal(first, labels))
+        self.assertEqual(sorted(first.tolist()), sorted(labels.tolist()))
 
 
 if __name__ == "__main__":

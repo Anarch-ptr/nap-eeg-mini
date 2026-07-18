@@ -19,6 +19,12 @@ SUMMARY_FIELDS = [
     "experiment",
     "subject",
     "seed",
+    "control_type",
+    "shuffle_seed",
+    "window_name",
+    "tmin",
+    "tmax",
+    "num_samples",
     "modality",
     "channels",
     "channel_names",
@@ -54,6 +60,12 @@ def save_eog_summary(summary: dict, config: dict) -> Path:
         "experiment": summary["experiment"],
         "subject": summary["subject"],
         "seed": summary["seed"],
+        "control_type": summary["control_type"],
+        "shuffle_seed": summary["shuffle_seed"],
+        "window_name": summary["window_name"],
+        "tmin": summary["epoch_tmin"],
+        "tmax": summary["epoch_tmax"],
+        "num_samples": summary["num_samples"],
         "modality": summary["modality"],
         "channels": summary["channels"],
         "channel_names": ",".join(summary["channel_names"]),
@@ -97,6 +109,11 @@ def parse_args() -> argparse.Namespace:
         help="Explicit short override for a smoke test only.",
     )
     parser.add_argument("--output-dir", type=Path, default=None)
+    parser.add_argument("--window-name", type=str, default=None)
+    parser.add_argument("--tmin", type=float, default=None)
+    parser.add_argument("--tmax", type=float, default=None)
+    parser.add_argument("--label-shuffle", action="store_true")
+    parser.add_argument("--shuffle-seed", type=int, default=20260718)
     return parser.parse_args()
 
 
@@ -114,6 +131,24 @@ def main() -> None:
         config["experiment"] += "_smoke_test"
     if args.output_dir is not None:
         config["output"]["table_dir"] = str(args.output_dir)
+    window_args = (args.window_name, args.tmin, args.tmax)
+    if any(value is not None for value in window_args):
+        if not all(value is not None for value in window_args):
+            raise ValueError("Window name, tmin, and tmax must be provided together.")
+        config["temporal_window"] = {
+            "name": args.window_name,
+            "tmin": args.tmin,
+            "tmax": args.tmax,
+        }
+        config["data"]["tmin"] = args.tmin
+        config["data"]["tmax"] = args.tmax
+        config["experiment"] = "bci2a_eog_temporal_audit"
+    if args.label_shuffle:
+        config["label_shuffle"] = {
+            "enabled": True,
+            "seed": args.shuffle_seed,
+        }
+        config["experiment"] = "bci2a_eog_label_shuffle_control"
 
     result = run_training(config)
     detailed_metrics = evaluate_classifier_detailed(

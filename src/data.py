@@ -49,6 +49,8 @@ class BCI2AEOGSubjectData:
     channel_types: list[str]
     sampling_rate: float
     subject_id: int
+    epoch_tmin: float
+    epoch_tmax: float
 
 
 @dataclass
@@ -286,6 +288,24 @@ def _add_bci2a_trial_identity(
     return identified
 
 
+def temporal_window_sample_bounds(
+    window_tmin: float,
+    window_tmax: float,
+    epoch_tmin: float,
+    sampling_rate: float,
+    total_samples: int,
+) -> tuple[int, int]:
+    """Convert an inclusive seconds window to inclusive sample indices."""
+
+    if window_tmin < epoch_tmin or window_tmax <= window_tmin:
+        raise ValueError("Invalid temporal window.")
+    start = round((window_tmin - epoch_tmin) * sampling_rate)
+    stop = round((window_tmax - epoch_tmin) * sampling_rate)
+    if start < 0 or stop >= total_samples:
+        raise ValueError("Temporal window falls outside the epoch.")
+    return int(start), int(stop)
+
+
 def _validate_bci2a_eeg_eog_alignment(
     eeg_epochs,
     eeg_labels: np.ndarray,
@@ -397,6 +417,11 @@ def load_bci2a_eog_subject(
         )
 
     eog = eog_epochs.get_data(copy=True).astype(np.float32)
+    expected_samples = round((tmax - tmin) * eog_epochs.info["sfreq"]) + 1
+    if eog.shape[2] != expected_samples:
+        raise RuntimeError(
+            f"Expected {expected_samples} temporal samples, got {eog.shape[2]}"
+        )
     session_split = split_bci2a_sessions(
         x=eog,
         y=multimodal_labels,
@@ -422,4 +447,6 @@ def load_bci2a_eog_subject(
         channel_types=eog_channel_types,
         sampling_rate=float(eog_epochs.info["sfreq"]),
         subject_id=subject_id,
+        epoch_tmin=float(tmin),
+        epoch_tmax=float(tmax),
     )

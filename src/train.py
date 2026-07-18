@@ -65,6 +65,19 @@ def set_seed(seed: int) -> torch.Generator:
     return torch.Generator().manual_seed(seed)
 
 
+def deterministic_label_shuffle(labels: torch.Tensor, seed: int) -> torch.Tensor:
+    """Shuffle labels reproducibly while preserving their exact multiset."""
+
+    permutation = torch.randperm(
+        len(labels),
+        generator=torch.Generator().manual_seed(seed),
+    )
+    shuffled = labels[permutation].clone()
+    if len(labels) > 1 and torch.equal(shuffled, labels):
+        shuffled = torch.roll(shuffled, shifts=1)
+    return shuffled
+
+
 def load_config(config_path):
     """
     Load a YAML configuration file.
@@ -319,6 +332,12 @@ def build_dataloaders(config):
         y_val = y[val_indices]
         x_test = torch.from_numpy(subject_data.x_test).float()
         y_test = torch.from_numpy(subject_data.y_test).long()
+
+        shuffle_config = config.get("label_shuffle", {})
+        if shuffle_config.get("enabled", False):
+            shuffle_seed = int(shuffle_config["seed"])
+            y_train = deterministic_label_shuffle(y_train, shuffle_seed)
+            y_val = deterministic_label_shuffle(y_val, shuffle_seed + 1)
 
         if data_config.get("normalize", True):
             channel_mean = x_train.mean(
@@ -846,6 +865,18 @@ def run_training(
                 "train_samples": len(data_bundle.train_loader.dataset),
                 "validation_samples": len(data_bundle.val_loader.dataset),
                 "test_samples": len(data_bundle.test_loader.dataset),
+                "num_samples": int(config["data"]["num_samples"]),
+                "window_name": config.get("temporal_window", {}).get(
+                    "name", "full"
+                ),
+                "epoch_tmin": float(config["data"].get("tmin", 0.0)),
+                "epoch_tmax": float(config["data"].get("tmax", 4.0)),
+                "control_type": (
+                    "label_shuffle"
+                    if config.get("label_shuffle", {}).get("enabled", False)
+                    else "none"
+                ),
+                "shuffle_seed": config.get("label_shuffle", {}).get("seed"),
             }
         )
     save_run_summary(summary, config)
