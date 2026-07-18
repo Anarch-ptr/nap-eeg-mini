@@ -62,3 +62,31 @@ A02 (lower), training seed 42 and shuffle seed 20260718. Train and validation
 labels are permuted independently within their frozen subsets; official test
 labels remain real. Metadata is retained only for alignment and logging and is
 never included in the model input tensor.
+
+## Phase 1: pre-registered EOG-to-EEG coupling audit
+
+The analyzed signals are 22 EEG channels and three EOG channels from the same
+BNCI2014-001 Raw recording, both processed by the identical MOABB 1.5.0
+`MotorImagery(fmin=8, fmax=32, tmin=0, tmax=4)` pipeline at 250 Hz. The EOG
+predictors must therefore be described as EOG-channel activity within the
+baseline 8–32 Hz preprocessing passband, not raw broadband ocular activity.
+
+For every subject and frozen Phase 0C window, ordinary least squares maps the
+three simultaneous EOG samples to all 22 EEG channels. Channel-wise mean and
+standard deviation are fit using the complete official `0train` session only;
+coefficients are fit only on that session. Both transformations are fixed and
+evaluated on official `1test`. Held-out R2 is primary and may be negative;
+predicted/true Pearson correlation is secondary.
+
+The primary control is a deterministic, class-preserving, one-to-one
+cross-trial derangement within each official session. Train uses permutation
+seed 20260718 and test uses 20260719. It preserves subject, session, class,
+task phase, trial count, and temporal window while ensuring no EEG trial is
+paired with its own EOG trial. Separate OLS mappings are fit for same-trial and
+control conditions using identical EEG targets. The primary contrast is
+`R2_same_trial - R2_same_class_cross_trial`.
+
+All 22 EEG channels are primary. Regions are frozen before results as frontal
+(`Fz`, `FC3`, `FC1`, `FCz`, `FC2`, `FC4`), central (`C5`, `C3`, `C1`, `Cz`,
+`C2`, `C4`, `C6`), parietal (`CP3`, `CP1`, `CPz`, `CP2`, `CP4`, `P1`, `Pz`,
+`P2`), and occipital (`POz`). Region summaries are descriptive only.

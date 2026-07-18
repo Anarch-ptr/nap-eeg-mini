@@ -54,6 +54,24 @@ class BCI2AEOGSubjectData:
 
 
 @dataclass
+class BCI2ACouplingSubjectData:
+    """Aligned EEG and EOG arrays for label-blind coupling analysis."""
+
+    eeg_train: np.ndarray
+    eog_train: np.ndarray
+    y_train: np.ndarray
+    eeg_test: np.ndarray
+    eog_test: np.ndarray
+    y_test: np.ndarray
+    train_metadata: pd.DataFrame
+    test_metadata: pd.DataFrame
+    eeg_channel_names: list[str]
+    eog_channel_names: list[str]
+    sampling_rate: float
+    subject_id: int
+
+
+@dataclass
 class BCI2ASessionSplit:
     """Official train/test session split for BCI Competition IV 2a."""
 
@@ -449,4 +467,79 @@ def load_bci2a_eog_subject(
         subject_id=subject_id,
         epoch_tmin=float(tmin),
         epoch_tmax=float(tmax),
+    )
+
+
+def load_bci2a_coupling_subject(
+    subject_id: int,
+    data_dir: str | Path = "data/moabb",
+    fmin: float = 8.0,
+    fmax: float = 32.0,
+) -> BCI2ACouplingSubjectData:
+    """Load strictly aligned full-epoch EEG/EOG for coupling audit only."""
+
+    if subject_id not in range(1, 10):
+        raise ValueError(
+            f"subject_id must be between 1 and 9, got {subject_id}"
+        )
+    if fmin >= fmax:
+        raise ValueError(f"Expected fmin < fmax, got fmin={fmin}, fmax={fmax}")
+
+    resolved_data_dir = Path(data_dir).resolve()
+    resolved_data_dir.mkdir(parents=True, exist_ok=True)
+    from moabb import set_download_dir
+    from moabb.datasets import BNCI2014_001
+    from moabb.paradigms import MotorImagery
+
+    set_download_dir(str(resolved_data_dir))
+    paradigm = MotorImagery(
+        n_classes=4,
+        fmin=fmin,
+        fmax=fmax,
+        tmin=0.0,
+        tmax=4.0,
+    )
+    eeg_epochs, eeg_strings, eeg_metadata = paradigm.get_data(
+        dataset=BNCI2014_001(), subjects=[subject_id], return_epochs=True
+    )
+    all_epochs, all_strings, all_metadata = paradigm.get_data(
+        dataset=BNCI2014_001(return_all_modalities=True),
+        subjects=[subject_id],
+        return_epochs=True,
+    )
+    eeg_labels = encode_bci2a_labels(eeg_strings)
+    labels = encode_bci2a_labels(all_strings)
+    identified = _validate_bci2a_eeg_eog_alignment(
+        eeg_epochs,
+        eeg_labels,
+        eeg_metadata,
+        all_epochs,
+        labels,
+        all_metadata,
+    )
+    eeg = all_epochs.copy().pick("eeg")
+    eog = all_epochs.copy().pick("eog")
+    eeg_data = eeg.get_data(copy=True).astype(np.float32)
+    eog_data = eog.get_data(copy=True).astype(np.float32)
+    eeg_split = split_bci2a_sessions(eeg_data, labels, identified)
+    eog_split = split_bci2a_sessions(eog_data, labels, identified)
+    if not np.array_equal(eeg_split.y_train, eog_split.y_train) or not np.array_equal(
+        eeg_split.y_test, eog_split.y_test
+    ):
+        raise RuntimeError("EEG/EOG labels diverged during official session split.")
+    pd.testing.assert_frame_equal(eeg_split.train_metadata, eog_split.train_metadata)
+    pd.testing.assert_frame_equal(eeg_split.test_metadata, eog_split.test_metadata)
+    return BCI2ACouplingSubjectData(
+        eeg_train=eeg_split.x_train,
+        eog_train=eog_split.x_train,
+        y_train=eeg_split.y_train,
+        eeg_test=eeg_split.x_test,
+        eog_test=eog_split.x_test,
+        y_test=eeg_split.y_test,
+        train_metadata=eeg_split.train_metadata,
+        test_metadata=eeg_split.test_metadata,
+        eeg_channel_names=list(eeg.ch_names),
+        eog_channel_names=list(eog.ch_names),
+        sampling_rate=float(eeg.info["sfreq"]),
+        subject_id=subject_id,
     )
