@@ -25,6 +25,7 @@ from src.audit import evaluate_channel_masking
 from src.audit import summarize_channel_masking_audit
 from src.datasets import SyntheticEEGDataset
 from src.data import load_bci2a_subject
+from src.data import load_bci2a_eog_subject
 from src.evaluate import evaluate_classifier
 from src.models.eegnet import EEGNet
 
@@ -40,6 +41,11 @@ class DataBundle:
     val_indices: list[int]
     test_indices: list[int]
     normalization: dict | None
+    modality: str | None = None
+    channel_names: list[str] | None = None
+    channel_types: list[str] | None = None
+    sampling_rate: float | None = None
+    subject_id: int | None = None
 
 
 def set_seed(seed: int) -> torch.Generator:
@@ -152,6 +158,11 @@ def build_dataloaders(config):
     test_dataset = None
     test_indices = []
     normalization = None
+    modality = None
+    channel_names = None
+    channel_types = None
+    sampling_rate = None
+    subject_id = None
 
     if dataset_name == "synthetic":
         dataset = SyntheticEEGDataset(
@@ -186,6 +197,98 @@ def build_dataloaders(config):
             tmin=data_config.get("tmin", 0.0),
             tmax=data_config.get("tmax", 4.0),
         )
+        modality = "eeg"
+        channel_names = list(subject_data.channel_names)
+        channel_types = ["eeg"] * len(channel_names)
+        sampling_rate = subject_data.sampling_rate
+        subject_id = data_config["subject_id"]
+
+        x = torch.from_numpy(subject_data.x_train).float()
+        y = torch.from_numpy(subject_data.y_train).long()
+
+        num_trials = x.shape[0]
+        train_size = int(train_ratio * num_trials)
+        val_size = num_trials - train_size
+
+        if train_size <= 0 or val_size <= 0:
+            raise ValueError(
+                f"Invalid train/validation split: "
+                f"train={train_size}, val={val_size}"
+            )
+
+        generator = torch.Generator().manual_seed(seed)
+        shuffled_indices = torch.randperm(
+            num_trials,
+            generator=generator,
+        )
+
+        train_indices = shuffled_indices[:train_size]
+        val_indices = shuffled_indices[train_size:]
+
+        x_train = x[train_indices]
+        y_train = y[train_indices]
+
+        x_val = x[val_indices]
+        y_val = y[val_indices]
+        x_test = torch.from_numpy(subject_data.x_test).float()
+        y_test = torch.from_numpy(subject_data.y_test).long()
+
+        if data_config.get("normalize", True):
+            channel_mean = x_train.mean(
+                dim=(0, 2),
+                keepdim=True,
+            )
+            channel_std = x_train.std(
+                dim=(0, 2),
+                keepdim=True,
+            ).clamp_min(1e-6)
+
+            x_train = (x_train - channel_mean) / channel_std
+            x_val = (x_val - channel_mean) / channel_std
+            x_test = (x_test - channel_mean) / channel_std
+            normalization = {
+                "source": "train_subset",
+                "mean": channel_mean.squeeze().cpu().tolist(),
+                "std": channel_std.squeeze().cpu().tolist(),
+            }
+
+        train_dataset = TensorDataset(x_train, y_train)
+        val_dataset = TensorDataset(x_val, y_val)
+        test_dataset = TensorDataset(x_test, y_test)
+        train_indices = [int(index) for index in train_indices.tolist()]
+        val_indices = [int(index) for index in val_indices.tolist()]
+        test_indices = list(range(int(subject_data.x_test.shape[0])))
+
+        data_config["num_channels"] = int(x.shape[1])
+        data_config["num_samples"] = int(x.shape[2])
+        data_config["num_classes"] = 4
+
+        print("Dataset source: BCI Competition IV 2a")
+        print(f"Subject: A{data_config['subject_id']:02d}")
+        print(f"Official train shape: {tuple(subject_data.x_train.shape)}")
+        print(f"Official test shape:  {tuple(subject_data.x_test.shape)}")
+        print(f"Training trials: {train_size}")
+        print(f"Validation trials: {val_size}")
+        print(f"Test trials: {subject_data.x_test.shape[0]}")
+        print(f"Channels: {data_config['num_channels']}")
+        print(f"Samples per trial: {data_config['num_samples']}")
+        print(f"Sampling rate: {subject_data.sampling_rate}")
+        print("Official test session is not used during training.")
+
+    elif dataset_name in {"bci2a_eog", "bci2a_eog_only"}:
+        subject_data = load_bci2a_eog_subject(
+            subject_id=data_config["subject_id"],
+            data_dir=data_config.get("data_dir", "data/moabb"),
+            fmin=data_config.get("fmin", 8.0),
+            fmax=data_config.get("fmax", 32.0),
+            tmin=data_config.get("tmin", 0.0),
+            tmax=data_config.get("tmax", 4.0),
+        )
+        modality = "eog"
+        channel_names = list(subject_data.channel_names)
+        channel_types = list(subject_data.channel_types)
+        sampling_rate = subject_data.sampling_rate
+        subject_id = subject_data.subject_id
 
         x = torch.from_numpy(subject_data.x_train).float()
         y = torch.from_numpy(subject_data.y_train).long()
@@ -249,7 +352,7 @@ def build_dataloaders(config):
         data_config["num_samples"] = int(x.shape[2])
         data_config["num_classes"] = 4
 
-        print("Dataset source: BCI Competition IV 2a")
+        print("Dataset source: BCI Competition IV 2a audit-only EOG")
         print(f"Subject: A{data_config['subject_id']:02d}")
         print(f"Official train shape: {tuple(subject_data.x_train.shape)}")
         print(f"Official test shape:  {tuple(subject_data.x_test.shape)}")
@@ -259,6 +362,7 @@ def build_dataloaders(config):
         print(f"Channels: {data_config['num_channels']}")
         print(f"Samples per trial: {data_config['num_samples']}")
         print(f"Sampling rate: {subject_data.sampling_rate}")
+        print(f"Channel names: {subject_data.channel_names}")
         print("Official test session is not used during training.")
 
     else:
@@ -295,6 +399,11 @@ def build_dataloaders(config):
         val_indices=val_indices,
         test_indices=test_indices,
         normalization=normalization,
+        modality=modality,
+        channel_names=channel_names,
+        channel_types=channel_types,
+        sampling_rate=sampling_rate,
+        subject_id=subject_id,
     )
 
 
@@ -723,6 +832,22 @@ def run_training(
         "best_checkpoint": checkpoint_path,
         "normalization": data_bundle.normalization,
     }
+    if data_bundle.modality == "eog":
+        summary.update(
+            {
+                "experiment": config["experiment"],
+                "modality": "eog",
+                "subject": data_bundle.subject_id,
+                "seed": config["seed"],
+                "channels": len(data_bundle.channel_names or []),
+                "channel_names": data_bundle.channel_names,
+                "channel_types": data_bundle.channel_types,
+                "sampling_rate": data_bundle.sampling_rate,
+                "train_samples": len(data_bundle.train_loader.dataset),
+                "validation_samples": len(data_bundle.val_loader.dataset),
+                "test_samples": len(data_bundle.test_loader.dataset),
+            }
+        )
     save_run_summary(summary, config)
 
     return {
