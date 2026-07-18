@@ -90,3 +90,14 @@ All 22 EEG channels are primary. Regions are frozen before results as frontal
 (`Fz`, `FC3`, `FC1`, `FCz`, `FC2`, `FC4`), central (`C5`, `C3`, `C1`, `Cz`,
 `C2`, `C4`, `C6`), parietal (`CP3`, `CP1`, `CPz`, `CP2`, `CP4`, `P1`, `Pz`,
 `P2`), and occipital (`POz`). Region summaries are descriptive only.
+## Phase 2A: frozen EEGNet EOG-coupled component dependency audit
+
+Phase 2A uses the 27 sealed subject-by-seed EEGNet checkpoints without
+retraining.  For each run, EEG and EOG normalization and the linear coupling
+mapping are fit only from that checkpoint's saved training subset.  The
+EOG-dependent linear term (excluding the intercept) is removed at frozen
+alpha values 1.0 and 0.5 inside the frozen full, early, middle, and late
+windows.  The primary comparator is a deterministic same-class cross-trial
+component matched per trial in RMS energy.  A deterministic orthogonal
+channel rotation is a secondary equal-rank/equal-singular-value control.
+Clean checkpoint reproduction is a mandatory fail-fast integrity gate.
