@@ -17,6 +17,7 @@ from src.data import BCI2AEOGSubjectData
 from src.data import _add_bci2a_trial_identity
 from src.data import _validate_bci2a_eeg_eog_alignment
 from src.train import build_dataloaders
+from src.evaluate import evaluate_classifier_detailed
 
 
 class FakeEpochs:
@@ -188,6 +189,13 @@ class TestEOGTrainingPath(unittest.TestCase):
                 "best_epoch": 1,
                 "best_validation_metrics": {"accuracy": 0.25},
                 "final_test_metrics": {"accuracy": 0.25},
+                "official_test_detailed_metrics": {
+                    "accuracy": 0.25,
+                    "balanced_accuracy": 0.25,
+                    "macro_f1": 0.2,
+                    "per_class_recall": [0.25, 0.25, 0.25, 0.25],
+                    "confusion_matrix": [[1, 0, 0, 0]] * 4,
+                },
                 "best_checkpoint": "checkpoint.pt",
                 "normalization": {"source": "train_subset"},
             }
@@ -195,6 +203,35 @@ class TestEOGTrainingPath(unittest.TestCase):
             content = output_path.read_text(encoding="utf-8")
             self.assertIn("EOG1,EOG2,EOG3", content)
             self.assertIn("does not prove", content)
+
+
+class TestDetailedEvaluation(unittest.TestCase):
+    def test_metrics_include_balanced_f1_recall_and_confusion(self) -> None:
+        class FixedModel(torch.nn.Module):
+            def forward(self, x):
+                return x
+
+        logits = torch.tensor(
+            [
+                [5.0, 0.0, 0.0, 0.0],
+                [0.0, 5.0, 0.0, 0.0],
+                [0.0, 5.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 5.0],
+            ]
+        )
+        targets = torch.tensor([0, 1, 2, 3])
+        loader = torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(logits, targets),
+            batch_size=2,
+        )
+        metrics = evaluate_classifier_detailed(
+            FixedModel(), loader, torch.device("cpu"), num_classes=4
+        )
+        self.assertEqual(metrics["accuracy"], 0.75)
+        self.assertEqual(metrics["balanced_accuracy"], 0.75)
+        self.assertEqual(metrics["per_class_recall"], [1.0, 1.0, 0.0, 1.0])
+        self.assertEqual(metrics["confusion_matrix"][2], [0, 1, 0, 0])
+        self.assertAlmostEqual(metrics["macro_f1"], 2.0 / 3.0)
 
 
 if __name__ == "__main__":

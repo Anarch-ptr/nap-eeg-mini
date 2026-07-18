@@ -5,11 +5,14 @@ from __future__ import annotations
 import argparse
 import copy
 import csv
+import json
 from pathlib import Path
 
 from src.train import load_config
 from src.train import run_training
 from src.train import save_training_history
+from src.train import save_run_summary
+from src.evaluate import evaluate_classifier_detailed
 
 
 SUMMARY_FIELDS = [
@@ -25,6 +28,10 @@ SUMMARY_FIELDS = [
     "best_epoch",
     "validation_accuracy",
     "test_accuracy",
+    "balanced_accuracy",
+    "macro_f1",
+    "per_class_recall",
+    "confusion_matrix",
     "checkpoint",
     "normalization_source",
     "interpretation",
@@ -42,6 +49,7 @@ def save_eog_summary(summary: dict, config: dict) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     validation = summary["best_validation_metrics"]
     test = summary["final_test_metrics"]
+    detailed = summary["official_test_detailed_metrics"]
     row = {
         "experiment": summary["experiment"],
         "subject": summary["subject"],
@@ -55,6 +63,10 @@ def save_eog_summary(summary: dict, config: dict) -> Path:
         "best_epoch": summary["best_epoch"],
         "validation_accuracy": validation["accuracy"],
         "test_accuracy": test["accuracy"],
+        "balanced_accuracy": detailed["balanced_accuracy"],
+        "macro_f1": detailed["macro_f1"],
+        "per_class_recall": json.dumps(detailed["per_class_recall"]),
+        "confusion_matrix": json.dumps(detailed["confusion_matrix"]),
         "checkpoint": summary["best_checkpoint"],
         "normalization_source": summary["normalization"]["source"],
         "interpretation": (
@@ -104,6 +116,17 @@ def main() -> None:
         config["output"]["table_dir"] = str(args.output_dir)
 
     result = run_training(config)
+    detailed_metrics = evaluate_classifier_detailed(
+        model=result["model"],
+        dataloader=result["data_bundle"].test_loader,
+        device=result["device"],
+        num_classes=config["data"]["num_classes"],
+    )
+    test_accuracy = result["summary"]["final_test_metrics"]["accuracy"]
+    if abs(detailed_metrics["accuracy"] - test_accuracy) > 1e-12:
+        raise RuntimeError("Detailed and standard test accuracy disagree.")
+    result["summary"]["official_test_detailed_metrics"] = detailed_metrics
+    save_run_summary(result["summary"], config)
     save_training_history(result["history"], config)
     summary_path = save_eog_summary(result["summary"], config)
     print(f"Saved EOG-only experiment summary: {summary_path}")
