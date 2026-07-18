@@ -34,6 +34,44 @@ class BCI2ASubjectData:
 
 
 @dataclass
+class BCI2AEOGSubjectData:
+    """Session-separated, audit-only EOG data aligned to BCI2a EEG trials."""
+
+    x_train: np.ndarray
+    y_train: np.ndarray
+    x_test: np.ndarray
+    y_test: np.ndarray
+
+    train_metadata: pd.DataFrame
+    test_metadata: pd.DataFrame
+
+    channel_names: list[str]
+    channel_types: list[str]
+    sampling_rate: float
+    subject_id: int
+    epoch_tmin: float
+    epoch_tmax: float
+
+
+@dataclass
+class BCI2ACouplingSubjectData:
+    """Aligned EEG and EOG arrays for label-blind coupling analysis."""
+
+    eeg_train: np.ndarray
+    eog_train: np.ndarray
+    y_train: np.ndarray
+    eeg_test: np.ndarray
+    eog_test: np.ndarray
+    y_test: np.ndarray
+    train_metadata: pd.DataFrame
+    test_metadata: pd.DataFrame
+    eeg_channel_names: list[str]
+    eog_channel_names: list[str]
+    sampling_rate: float
+    subject_id: int
+
+
+@dataclass
 class BCI2ASessionSplit:
     """Official train/test session split for BCI Competition IV 2a."""
 
@@ -244,4 +282,264 @@ def load_bci2a_subject(
         test_metadata=session_split.test_metadata,
         channel_names=list(epochs.ch_names),
         sampling_rate=float(epochs.info["sfreq"]),
+    )
+
+
+def _add_bci2a_trial_identity(
+    metadata: pd.DataFrame,
+    events: np.ndarray,
+) -> pd.DataFrame:
+    """Add the strongest trial identity exposed by the MOABB 1.5 API."""
+
+    if len(metadata) != len(events):
+        raise RuntimeError("Metadata and MNE events have different lengths.")
+    if "run" not in metadata.columns:
+        raise RuntimeError("BCI2a metadata must contain a 'run' column.")
+
+    identified = metadata.copy().reset_index(drop=True)
+    identified["trial_in_run"] = identified.groupby(
+        ["subject", "session", "run"],
+        sort=False,
+    ).cumcount()
+    identified["event_sample"] = events[:, 0].astype(np.int64)
+    identified["event_code"] = events[:, 2].astype(np.int64)
+    return identified
+
+
+def temporal_window_sample_bounds(
+    window_tmin: float,
+    window_tmax: float,
+    epoch_tmin: float,
+    sampling_rate: float,
+    total_samples: int,
+) -> tuple[int, int]:
+    """Convert an inclusive seconds window to inclusive sample indices."""
+
+    if window_tmin < epoch_tmin or window_tmax <= window_tmin:
+        raise ValueError("Invalid temporal window.")
+    start = round((window_tmin - epoch_tmin) * sampling_rate)
+    stop = round((window_tmax - epoch_tmin) * sampling_rate)
+    if start < 0 or stop >= total_samples:
+        raise ValueError("Temporal window falls outside the epoch.")
+    return int(start), int(stop)
+
+
+def _validate_bci2a_eeg_eog_alignment(
+    eeg_epochs,
+    eeg_labels: np.ndarray,
+    eeg_metadata: pd.DataFrame,
+    multimodal_epochs,
+    multimodal_labels: np.ndarray,
+    multimodal_metadata: pd.DataFrame,
+) -> pd.DataFrame:
+    """Validate that default EEG and all-modality epochs are trial-aligned."""
+
+    if not np.array_equal(eeg_labels, multimodal_labels):
+        raise RuntimeError("EEG/EOG label alignment failed.")
+    if not eeg_metadata.reset_index(drop=True).equals(
+        multimodal_metadata.reset_index(drop=True)
+    ):
+        raise RuntimeError("EEG/EOG subject/session/run metadata alignment failed.")
+    if not np.array_equal(eeg_epochs.events, multimodal_epochs.events):
+        raise RuntimeError("EEG/EOG MNE event alignment failed.")
+
+    multimodal_eeg = multimodal_epochs.copy().pick("eeg").get_data(copy=True)
+    baseline_eeg = eeg_epochs.get_data(copy=True)
+    if baseline_eeg.shape != multimodal_eeg.shape or not np.array_equal(
+        baseline_eeg,
+        multimodal_eeg,
+    ):
+        raise RuntimeError("All-modality loading changed the aligned EEG epochs.")
+
+    return _add_bci2a_trial_identity(
+        multimodal_metadata,
+        multimodal_epochs.events,
+    )
+
+
+def load_bci2a_eog_subject(
+    subject_id: int,
+    data_dir: str | Path = "data/moabb",
+    fmin: float = 8.0,
+    fmax: float = 32.0,
+    tmin: float = 0.0,
+    tmax: float = 4.0,
+) -> BCI2AEOGSubjectData:
+    """Load the three official EOG channels for audit-only classification.
+
+    The frozen baseline loader remains EEG-only. This function independently
+    loads both the default EEG epochs and all modalities, then requires exact
+    label, metadata, event, and EEG-sample equality before returning EOG.
+    """
+
+    if subject_id not in range(1, 10):
+        raise ValueError(
+            f"subject_id must be between 1 and 9, got {subject_id}"
+        )
+    if fmin >= fmax:
+        raise ValueError(
+            f"Expected fmin < fmax, got fmin={fmin}, fmax={fmax}"
+        )
+    if tmin >= tmax:
+        raise ValueError(
+            f"Expected tmin < tmax, got tmin={tmin}, tmax={tmax}"
+        )
+
+    resolved_data_dir = Path(data_dir).resolve()
+    resolved_data_dir.mkdir(parents=True, exist_ok=True)
+
+    from moabb import set_download_dir
+    from moabb.datasets import BNCI2014_001
+    from moabb.paradigms import MotorImagery
+
+    set_download_dir(str(resolved_data_dir))
+    paradigm = MotorImagery(
+        n_classes=4,
+        fmin=fmin,
+        fmax=fmax,
+        tmin=tmin,
+        tmax=tmax,
+    )
+
+    eeg_epochs, eeg_string_labels, eeg_metadata = paradigm.get_data(
+        dataset=BNCI2014_001(),
+        subjects=[subject_id],
+        return_epochs=True,
+    )
+    multimodal_epochs, multimodal_string_labels, multimodal_metadata = (
+        paradigm.get_data(
+            dataset=BNCI2014_001(return_all_modalities=True),
+            subjects=[subject_id],
+            return_epochs=True,
+        )
+    )
+
+    eeg_labels = encode_bci2a_labels(eeg_string_labels)
+    multimodal_labels = encode_bci2a_labels(multimodal_string_labels)
+    aligned_metadata = _validate_bci2a_eeg_eog_alignment(
+        eeg_epochs,
+        eeg_labels,
+        eeg_metadata,
+        multimodal_epochs,
+        multimodal_labels,
+        multimodal_metadata,
+    )
+
+    eog_epochs = multimodal_epochs.copy().pick("eog")
+    eog_channel_names = list(eog_epochs.ch_names)
+    eog_channel_types = list(eog_epochs.get_channel_types())
+    if len(eog_channel_names) != 3 or eog_channel_types != ["eog"] * 3:
+        raise RuntimeError(
+            "Expected exactly three EOG channels, got "
+            f"{list(zip(eog_channel_names, eog_channel_types))}"
+        )
+
+    eog = eog_epochs.get_data(copy=True).astype(np.float32)
+    expected_samples = round((tmax - tmin) * eog_epochs.info["sfreq"]) + 1
+    if eog.shape[2] != expected_samples:
+        raise RuntimeError(
+            f"Expected {expected_samples} temporal samples, got {eog.shape[2]}"
+        )
+    session_split = split_bci2a_sessions(
+        x=eog,
+        y=multimodal_labels,
+        metadata=aligned_metadata,
+    )
+    if session_split.x_train.shape[0] != 288 or session_split.x_test.shape[0] != 288:
+        raise RuntimeError("Expected 288 EOG trials in each official session.")
+    if session_split.x_train.shape[1] != 3 or session_split.x_test.shape[1] != 3:
+        raise RuntimeError("Expected three EOG channels for BCI2a audit data.")
+    if not np.isfinite(session_split.x_train).all() or not np.isfinite(
+        session_split.x_test
+    ).all():
+        raise RuntimeError("EOG data contains NaN or Inf values.")
+
+    return BCI2AEOGSubjectData(
+        x_train=session_split.x_train,
+        y_train=session_split.y_train,
+        x_test=session_split.x_test,
+        y_test=session_split.y_test,
+        train_metadata=session_split.train_metadata,
+        test_metadata=session_split.test_metadata,
+        channel_names=eog_channel_names,
+        channel_types=eog_channel_types,
+        sampling_rate=float(eog_epochs.info["sfreq"]),
+        subject_id=subject_id,
+        epoch_tmin=float(tmin),
+        epoch_tmax=float(tmax),
+    )
+
+
+def load_bci2a_coupling_subject(
+    subject_id: int,
+    data_dir: str | Path = "data/moabb",
+    fmin: float = 8.0,
+    fmax: float = 32.0,
+) -> BCI2ACouplingSubjectData:
+    """Load strictly aligned full-epoch EEG/EOG for coupling audit only."""
+
+    if subject_id not in range(1, 10):
+        raise ValueError(
+            f"subject_id must be between 1 and 9, got {subject_id}"
+        )
+    if fmin >= fmax:
+        raise ValueError(f"Expected fmin < fmax, got fmin={fmin}, fmax={fmax}")
+
+    resolved_data_dir = Path(data_dir).resolve()
+    resolved_data_dir.mkdir(parents=True, exist_ok=True)
+    from moabb import set_download_dir
+    from moabb.datasets import BNCI2014_001
+    from moabb.paradigms import MotorImagery
+
+    set_download_dir(str(resolved_data_dir))
+    paradigm = MotorImagery(
+        n_classes=4,
+        fmin=fmin,
+        fmax=fmax,
+        tmin=0.0,
+        tmax=4.0,
+    )
+    eeg_epochs, eeg_strings, eeg_metadata = paradigm.get_data(
+        dataset=BNCI2014_001(), subjects=[subject_id], return_epochs=True
+    )
+    all_epochs, all_strings, all_metadata = paradigm.get_data(
+        dataset=BNCI2014_001(return_all_modalities=True),
+        subjects=[subject_id],
+        return_epochs=True,
+    )
+    eeg_labels = encode_bci2a_labels(eeg_strings)
+    labels = encode_bci2a_labels(all_strings)
+    identified = _validate_bci2a_eeg_eog_alignment(
+        eeg_epochs,
+        eeg_labels,
+        eeg_metadata,
+        all_epochs,
+        labels,
+        all_metadata,
+    )
+    eeg = all_epochs.copy().pick("eeg")
+    eog = all_epochs.copy().pick("eog")
+    eeg_data = eeg.get_data(copy=True).astype(np.float32)
+    eog_data = eog.get_data(copy=True).astype(np.float32)
+    eeg_split = split_bci2a_sessions(eeg_data, labels, identified)
+    eog_split = split_bci2a_sessions(eog_data, labels, identified)
+    if not np.array_equal(eeg_split.y_train, eog_split.y_train) or not np.array_equal(
+        eeg_split.y_test, eog_split.y_test
+    ):
+        raise RuntimeError("EEG/EOG labels diverged during official session split.")
+    pd.testing.assert_frame_equal(eeg_split.train_metadata, eog_split.train_metadata)
+    pd.testing.assert_frame_equal(eeg_split.test_metadata, eog_split.test_metadata)
+    return BCI2ACouplingSubjectData(
+        eeg_train=eeg_split.x_train,
+        eog_train=eog_split.x_train,
+        y_train=eeg_split.y_train,
+        eeg_test=eeg_split.x_test,
+        eog_test=eog_split.x_test,
+        y_test=eeg_split.y_test,
+        train_metadata=eeg_split.train_metadata,
+        test_metadata=eeg_split.test_metadata,
+        eeg_channel_names=list(eeg.ch_names),
+        eog_channel_names=list(eog.ch_names),
+        sampling_rate=float(eeg.info["sfreq"]),
+        subject_id=subject_id,
     )

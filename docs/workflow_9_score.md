@@ -12,13 +12,15 @@ The project follows a fixed research order:
 
 1. Establish the scientific positioning before adding new modules.
 2. Visualize and audit the existing baseline before claiming improvement.
-3. Define artifact sensitivity tests before designing NAP-A.
-4. Evaluate the proposed module only after baseline failure modes are documented.
+3. Complete artifact sensitivity tests, evidence synthesis, and a NAP-A decision gate before proposing a module.
+4. Proceed only with a newly framed hypothesis when the decision gate finds it justified.
 5. Keep every experiment reproducible, logged, and separately committed.
 
 The key rule is:
 
 > Do not design the solution before proving the problem.
+
+The current decision sequence is: baseline → Artifact Audit → evidence synthesis → decision gate → reframed hypothesis, if justified.
 
 ## Nine-Stage Execution Plan
 
@@ -139,13 +141,13 @@ Evaluate model robustness under controlled perturbations.
 
 **Purpose:**
 
-Design a lightweight reliability module only after baseline artifact sensitivity has been demonstrated.
+Design a lightweight reliability module only after Artifact Audit evidence synthesis and a decision gate justify a newly framed target failure mode.
 
 **Acceptance criteria:**
 
 - The module has a clearly defined input and output.
 - The module is small enough to be justified as a reliability component rather than a completely new architecture.
-- The design is motivated by Stage 4 and Stage 5 results.
+- The design is motivated by a documented decision gate, not by artifact presence alone.
 - No improvement claim is made before ablation testing.
 
 ------
@@ -267,4 +269,4 @@ At the current stage, this project does not claim:
 
 ## Final Position
 
-NAP-EEG-Mini is a small but rigorous project. Its value comes from the experimental discipline: define the failure mode, audit the baseline, stress-test robustness, then propose a targeted reliability module.
+NAP-EEG-Mini is a small but rigorous project. Its value comes from the experimental discipline: define the failure mode, audit the baseline, synthesize the evidence, apply a decision gate, and only then consider a justified reframed reliability module.
