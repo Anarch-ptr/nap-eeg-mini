@@ -101,3 +101,17 @@ windows.  The primary comparator is a deterministic same-class cross-trial
 component matched per trial in RMS energy.  A deterministic orthogonal
 channel rotation is a secondary equal-rank/equal-singular-value control.
 Clean checkpoint reproduction is a mandatory fail-fast integrity gate.
+## Phase 2B: pre-registered spatial dependency controls
+
+The frozen BCI2a order is `Fz, FC3, FC1, FCz, FC2, FC4, C5, C3, C1,
+Cz, C2, C4, C6, CP3, CP1, CPz, CP2, CP4, P1, Pz, P2, POz`.
+Before test inference, the primary frontal group was frozen as indices 0--5.
+The matched non-frontal group is `CP3, CP1, CPz, CP2, CP4, Pz` (indices
+13, 14, 15, 16, 17, 19): it matches the six-channel count and uses two
+left/right pairs plus two midline sites, without selecting by variance or
+test performance. Five six-channel random groups are frozen in
+`src/spatial_artifact_audit.py`, generated once with seed 20260718. They may
+overlap the named groups because they represent unconditional fixed random
+channel-set controls. Standardized Gaussian sigma levels 0.25, 0.50, and
+1.00 and the existing full/early/middle/late windows were also frozen before
+test inference. No group may be replaced after observing results.
