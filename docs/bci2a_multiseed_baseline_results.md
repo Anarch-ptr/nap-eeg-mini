@@ -78,4 +78,3 @@ baseline for subsequent artifact robustness and NAP-based experiments.
 The current three-seed evaluation provides an initial estimate of
 training variability but should not be interpreted as a formal
 statistical significance test.
-
