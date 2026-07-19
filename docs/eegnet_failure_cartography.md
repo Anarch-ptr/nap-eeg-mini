@@ -382,3 +382,133 @@ Scientific interpretation remains stopped until corrected outputs pass the
 measurement-validity gate. The study is no longer described as operating under
 an untouched original preregistration; it operates under the original protocol
 plus this explicit amendment.
+
+## Completed Full-Matrix Audit Results
+
+**Status:** `COMPLETED_FULL_MATRIX`. The corrected audit contains 81/81 unique,
+completed cells (A01–A09 × 100%/50%/25% × seeds 42/43/44), all with split seed
+42, subset seed 20260719, matched frozen identities, restored checkpoints, and
+post-hoc-only official evaluation. All 81 risk–coverage outputs, 2,430 shift
+rows (81 × six stages × five metrics), and 972 representation-validity rows
+are present. Measurement validity passed: all embeddings and shift metrics are
+finite and nonconstant. No optimizer update, retraining, adaptation, or model
+change occurred.
+
+### Observed Evidence — WHEN
+
+Across subject × budget units after mean seed aggregation:
+
+| Budget | Validation accuracy | Official evaluation accuracy | Operational gap |
+|---:|---:|---:|---:|
+| 100% | 62.39% | 53.19% | 9.20 pp |
+| 50% | 52.55% | 45.20% | 7.35 pp |
+| 25% | 44.38% | 37.13% | 7.25 pp |
+
+Reduced training data primarily lowered performance in both sessions; it did
+not monotonically amplify the validation–evaluation gap. The 100%-to-25%
+official-evaluation loss ranged from −0.46 pp (A05) to 27.66 pp (A08), with
+substantial losses also for A03 and A09. Thus budget sensitivity was broadly
+present but strongly subject-dependent.
+
+Mean within-subject evaluation-accuracy seed SD was 3.41 pp at 100%, 4.65 pp
+at 50%, and 2.77 pp at 25%. Mean gap seed SD was 5.32, 5.79, and 5.88 pp,
+respectively. Seed 44 differed visibly at several conditions—for example the
+mean 100% operational gap was 4.39 pp versus 11.47 and 11.74 pp for seeds 42
+and 43. Seeds remain optimization realizations, not biological samples.
+
+### Observed Evidence — calibration and confidence
+
+Official evaluation generally worsened proper scoring and selective-risk
+metrics: mean evaluation-minus-validation NLL was +0.169/+0.094/+0.006 and
+Brier was +0.079/+0.041/+0.012 at 100%/50%/25%; AURC increased by
++0.063/+0.043/+0.031. Across 27 subject × budget units, gap association was
+rho 0.752 for NLL change, 0.770 for Brier change, and 0.732 for AURC change;
+directions remained positive for all three seeds and LOSO ranges were
+0.687–0.842, 0.710–0.810, and 0.651–0.871.
+
+The diagnostics did not support a single generic “calibration worsened” claim.
+ECE decreased on average at every budget and was higher on evaluation in only
+6/27 units. Error-detection AUROC increased in 21/27 units, while confidence
+increased for both correct and incorrect predictions. Proper-score/selective-
+risk degradation therefore accompanied performance loss, but metric
+disagreement is preserved and no uncertainty intervention is inferred.
+
+### Observed Evidence — WHERE
+
+Mean CORAL was numerically largest at classifier logits in most cells, but the
+protocol forbids equating the largest value with a failure layer. Across the 27
+subject × budget units, CORAL association with the operational gap was weak at
+every stage:
+
+| Stage | Spearman rho |
+|---|---:|
+| Model input | 0.084 |
+| Temporal convolution | 0.222 |
+| Depthwise spatial convolution | −0.148 |
+| Separable pointwise convolution | −0.070 |
+| Final latent | 0.050 |
+| Classifier logits | 0.198 |
+
+Budget-specific directions were inconsistent. For example, temporal CORAL rho
+was +0.367/+0.350 at 100%/25% but −0.167 at 50%; final-latent rho was
++0.117/+0.033 but −0.517 at 50%. CORAL LOSO ranges crossed or approached zero
+for every layer. No reproducible processing-stage increase was associated with
+actual evaluation degradation.
+
+Supporting metrics did not rescue a stable layer attribution. Covariance
+Frobenius difference necessarily had the same within-layer ranking as CORAL;
+feature-variance shift largely agreed with CORAL rankings, while RBF-MMD²
+agreement was only weak-to-moderate and its gap associations remained weak
+(rho 0.120–0.275). Feature-mean shift had the largest supporting gap rho at the
+temporal stage (0.407), still descriptive, metric-specific, and insufficient
+for attribution.
+
+### Statistical Result and reproducibility assessment
+
+1. **Subject consistency:** limited-data degradation was common but ranged
+   widely; operational gap profiles also differed qualitatively by subject.
+2. **Seed stability:** performance varied moderately, while internal-layer
+   CORAL seed SD relative to its mean was commonly 0.55–1.68. Stage-profile
+   seed agreement weakened at 50% and 25%, and budget-specific associations
+   changed direction.
+3. **Budget stability:** evaluation performance declined consistently, but the
+   operational gap did not increase with lower budget and layer associations
+   were not stable across budgets.
+4. **Supporting metrics:** covariance/variance diagnostics partly agreed with
+   CORAL, but MMD² and mean shift provided only partial, weak support; no
+   alternative metric established a stable layer.
+5. **Evaluation-degradation association:** proper-score and AURC changes were
+   related to the gap, but primary CORAL shifts were not meaningfully or
+   robustly related to it.
+
+### Interpretation, alternatives, and weakening evidence
+
+The most conservative interpretation is that operating-limit failure is real
+but the proposed internal representation-shift localization is sensitive to
+optimization realization and subject. Simpler alternatives remain: reduced
+data lowers general learnability in both sessions; validation–evaluation
+differences combine session variation with finite validation sampling; proper
+scores and AURC partly track the same prediction errors as accuracy; and the
+bounded activation summaries may omit relevant fine-grained structure.
+
+Evidence that would weaken the chosen interpretation includes independent
+replication showing stable layer-specific shift–gap relationships, much lower
+seed dispersion, consistent budget directions, and agreement beyond
+covariance-derived metrics. None was established here.
+
+### Outcome-State Classification and allowed next step
+
+**Primary classification: State 4 — Seed-sensitive or statistically unstable
+failure.** Important secondary characteristics are subject-specific
+heterogeneity and absence of stable layer localization. The evidence is not
+forced into a claim that failure is absent: budget-related performance loss and
+proper-score degradation are observed. It is also not promoted to State 1 or 2
+because no layer-wise primary-metric signature was stable across seeds,
+budgets, subjects, supporting metrics, and evaluation degradation.
+
+The Architecture Stop Rule applies. No global or conditional NAP component,
+alignment method, uncertainty intervention, or other architecture design is
+authorized. The exact allowed next step is further non-architectural review of
+training instability and measurement reliability, with any new analysis or
+replication separately motivated and preregistered. Immediate Failure
+Attribution or intervention design is not authorized.
