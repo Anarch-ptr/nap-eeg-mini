@@ -28,6 +28,8 @@ from src.data import load_bci2a_subject
 from src.data import load_bci2a_eog_subject
 from src.evaluate import evaluate_classifier
 from src.models.eegnet import EEGNet
+from src.small_sample_audit import build_subset_provenance
+from src.small_sample_audit import select_nested_training_indices
 
 
 @dataclass
@@ -46,6 +48,8 @@ class DataBundle:
     channel_types: list[str] | None = None
     sampling_rate: float | None = None
     subject_id: int | None = None
+    training_pool_indices: list[int] | None = None
+    subset_provenance: dict | None = None
 
 
 def set_seed(seed: int) -> torch.Generator:
@@ -176,6 +180,8 @@ def build_dataloaders(config):
     channel_types = None
     sampling_rate = None
     subject_id = None
+    training_pool_indices = None
+    subset_provenance = None
 
     if dataset_name == "synthetic":
         dataset = SyntheticEEGDataset(
@@ -229,7 +235,8 @@ def build_dataloaders(config):
                 f"train={train_size}, val={val_size}"
             )
 
-        generator = torch.Generator().manual_seed(seed)
+        split_seed = int(data_config.get("split_seed", seed))
+        generator = torch.Generator().manual_seed(split_seed)
         shuffled_indices = torch.randperm(
             num_trials,
             generator=generator,
@@ -237,6 +244,19 @@ def build_dataloaders(config):
 
         train_indices = shuffled_indices[:train_size]
         val_indices = shuffled_indices[train_size:]
+
+        training_pool_indices = train_indices.clone()
+        small_sample_config = config.get("small_sample", {})
+        if small_sample_config.get("enabled", False):
+            budget = float(small_sample_config["budget"])
+            subset_seed = int(small_sample_config["subset_seed"])
+            selected = select_nested_training_indices(
+                training_pool_indices.cpu().numpy(),
+                y.cpu().numpy(),
+                budget,
+                subset_seed,
+            )
+            train_indices = torch.from_numpy(selected).long()
 
         x_train = x[train_indices]
         y_train = y[train_indices]
@@ -268,9 +288,26 @@ def build_dataloaders(config):
         train_dataset = TensorDataset(x_train, y_train)
         val_dataset = TensorDataset(x_val, y_val)
         test_dataset = TensorDataset(x_test, y_test)
+        training_pool_indices = [
+            int(index) for index in training_pool_indices.tolist()
+        ]
         train_indices = [int(index) for index in train_indices.tolist()]
         val_indices = [int(index) for index in val_indices.tolist()]
         test_indices = list(range(int(subject_data.x_test.shape[0])))
+        subset_provenance = None
+        if small_sample_config.get("enabled", False):
+            subset_provenance = build_subset_provenance(
+                subject=subject_id,
+                budget=small_sample_config["budget"],
+                subset_seed=small_sample_config["subset_seed"],
+                split_seed=split_seed,
+                training_seed=seed,
+                training_pool_indices=training_pool_indices,
+                selected_indices=train_indices,
+                validation_indices=val_indices,
+                test_indices=test_indices,
+                labels=subject_data.y_train,
+            )
 
         data_config["num_channels"] = int(x.shape[1])
         data_config["num_samples"] = int(x.shape[2])
@@ -280,7 +317,9 @@ def build_dataloaders(config):
         print(f"Subject: A{data_config['subject_id']:02d}")
         print(f"Official train shape: {tuple(subject_data.x_train.shape)}")
         print(f"Official test shape:  {tuple(subject_data.x_test.shape)}")
-        print(f"Training trials: {train_size}")
+        print(f"Training trials: {len(train_dataset)}")
+        if training_pool_indices is not None:
+            print(f"Fixed training pool trials: {len(training_pool_indices)}")
         print(f"Validation trials: {val_size}")
         print(f"Test trials: {subject_data.x_test.shape[0]}")
         print(f"Channels: {data_config['num_channels']}")
@@ -423,6 +462,8 @@ def build_dataloaders(config):
         channel_types=channel_types,
         sampling_rate=sampling_rate,
         subject_id=subject_id,
+        training_pool_indices=training_pool_indices,
+        subset_provenance=subset_provenance,
     )
 
 
@@ -547,6 +588,10 @@ def save_split_indices(data_bundle, config):
         "validation_indices": data_bundle.val_indices,
         "test_indices": data_bundle.test_indices,
     }
+    if data_bundle.training_pool_indices is not None:
+        payload["training_pool_indices"] = data_bundle.training_pool_indices
+    if data_bundle.subset_provenance is not None:
+        payload["small_sample"] = data_bundle.subset_provenance
     save_json(payload, output_path, "Saved split indices")
 
 
