@@ -112,7 +112,7 @@ def association(feature_values, outcomes, source: str) -> dict:
         value = float(spearmanr(np.delete(x, index), np.delete(y, index)).statistic)
         loso.append(value if np.isfinite(value) else 0.0)
     sign = np.sign(rho)
-    stable = sum(np.sign(v) == sign and sign != 0 for v in loso)
+    stable = int(sum(np.sign(v) == sign and sign != 0 for v in loso))
     robust = (abs(rho) >= .6 and np.sign(tau) == sign and sign != 0
               and stable >= 8 and abs(statistics.median(loso)) >= .5)
     if robust:

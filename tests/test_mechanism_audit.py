@@ -77,6 +77,7 @@ class MechanismAuditTests(unittest.TestCase):
     def test_loso_influence(self):
         r=association(range(9),range(9),"training_data_only")
         self.assertEqual(len(r["loso_values"]),9);self.assertEqual(r["direction_stability_count"],9)
+        json.dumps(r)
 
     def test_robust_candidate_signal(self):
         self.assertEqual(association(range(9),range(9),"training_data_only")["classification"],"ROBUST_CANDIDATE_SIGNAL")
