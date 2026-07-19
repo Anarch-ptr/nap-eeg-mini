@@ -287,11 +287,7 @@ Key Methodological Lesson
 
 A central result of this study is the distinction between:
 
-cross-subject observational association
-
-and
-
-within-subject intervention relevance.
+cross-subject observational association and within-subject intervention relevance.
 
 A training-data property may strongly correlate with vulnerability across subjects without producing a common directional effect when manipulated within the same subject.
 
@@ -301,6 +297,7 @@ Strong cross-subject covariance association did not translate into a consistent 
 
 This finding reinforces the need to separate predictive markers from manipulable mechanisms before using them to motivate new model architectures.
 
+```
 
 ## Project Structure
 
