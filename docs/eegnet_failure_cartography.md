@@ -221,6 +221,43 @@ reproducibility are at least as important as isolated p-values. The operational
 `validation_accuracy - evaluation_accuracy` gap is useful but is not a pure
 causal estimate of session shift.
 
+### Measurement Validity and Controlled Unfreezing
+
+Before scientific classification, every layer/session embedding is checked for
+finite values, nonzero feature-value variation, feature shape, covariance rank,
+maximum sample-supported rank, and rank fraction. Every shift metric is checked
+for finite values, cross-cell minimum/maximum/sample SD, and exact constancy.
+These diagnostics test whether the ruler functions; they do not test whether a
+scientific relationship is strong.
+
+A valid CORAL metric with weak gap association is a scientific null or weak
+relationship and remains primary. CORAL is not invalid merely because MMD² is
+stronger or a figure is uninteresting. Metric invalidity requires demonstrable
+numerical, mathematical, feature-extraction, shape, saturation, or structural
+degeneracy. Natural sample-limited covariance rank alone is recorded and does
+not automatically invalidate CORAL.
+
+If measurement or implementation invalidity is demonstrated, scientific
+interpretation and five-state classification stop. Any correction requires a
+separate dated protocol amendment preserving the original protocol, stating
+the invalid assumption, evidence, exact change, exposure to observed cells,
+and bias risk. Scientific inconvenience, State 5, weak CORAL correlation, or
+a more attractive secondary metric are not valid reasons to unfreeze.
+
+Seed aggregation remains mean-based for biological subject × budget summaries.
+Individual seeds, sample SD, minimum, maximum, range, and maximum absolute
+deviation from the seed mean remain visible as optimization-instability
+diagnostics. A weak aggregate with one extreme seed is not automatically
+absence; it may support State 4 if accompanied by broader evidence. Median is
+not a replacement primary summary and, if ever shown, is exploratory
+sensitivity analysis only.
+
+Before full-matrix launch, the required conditions are: (A) engineering
+validity, (B) measurement capability on actual representations, and (C)
+analysis sufficiency for the frozen WHEN/WHERE questions. Early cells may be
+used only to detect numerical or shape failure—not to select a favorable
+metric, layer, budget, subject, or direction.
+
 ### Architecture Stop Rule
 
 If the complete audit does not identify a sufficiently reproducible signature

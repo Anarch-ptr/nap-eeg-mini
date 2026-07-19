@@ -350,7 +350,13 @@ The final repository test suite contains:
 
 ## Final Project Status
 
-Scientific investigation: Completed
+Completed scientific chain: archived through the heterogeneous covariance
+intervention STOP gate.
+
+Current engineering/research phase: EEGNet Failure Cartography infrastructure.
+This phase tests—without assuming—that cross-session and limited-data failure
+has reproducible structure. It does not reopen the artifact hypothesis or
+authorize NAP. The full 81-cell cartography experiment has not been run.
 
 Robust small-sample failure: Supported
 
