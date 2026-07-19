@@ -46,3 +46,27 @@ With n=9, results are exploratory. Subset representativeness is a hypothesis
 candidate, not an established mechanism. A robust association authorizes a
 targeted intervention study, not a NAP architecture. No association is an
 acceptable outcome.
+
+## Skeptical addendum and nonstationarity checks
+
+Log-bandpower is intentionally incomplete relative to EEGNet: it may omit
+cross-channel spatial structure, phase, temporal waveform and transient
+dynamics, and nonlinear channel interactions. A null result applies only to
+this preregistered representation; a positive result does not identify EEGNet's
+physical or learned manifold.
+
+Official-0train metadata reliably expose six runs and row-wise acquisition
+order, but no block or timestamp. Three descriptive confound checks are frozen
+and are not correlated with the outcome: subset-versus-remainder run-distribution
+total-variation distance; absolute mean normalized acquisition-position shift;
+and the equal-class mean run-distribution TVD. An obvious-imbalance flag uses
+`run TVD >= 0.25`, chronological shift `>= 0.20`, or mean class-by-run TVD
+`>= 0.30`. These thresholds only constrain interpretation and do not enter the
+candidate-signal gate.
+
+If none of four features passes the unchanged gate, the representativeness
+hypothesis is unsupported in this log-bandpower space. It cannot be rescued by
+subject-pair tests, threshold changes, new metrics, or a post-result feature
+space switch. If a robust signal coexists with obvious imbalance, it is reported
+as `REPRESENTATIVENESS_SIGNAL_WITH_NONSTATIONARITY_CONFOUND`, requiring a future
+run/order-controlled intervention rather than a causal or architectural claim.

@@ -10,7 +10,8 @@ import matplotlib.pyplot as plt
 from src.data import load_bci2a_subject
 from src.mechanism_audit import log_bandpower_features
 from src.subset_representativeness import (FEATURES, SUBJECTS, analyze,
-    reconstruct_partition, representativeness_features, shared_normalize)
+    nonstationarity_diagnostics, reconstruct_partition,
+    representativeness_features, shared_normalize)
 
 
 def read_csv(path):
@@ -48,6 +49,7 @@ def main():
         sub,rem=shared_normalize(raw,sub_raw,rem_raw)
         sub_labels=data.y_train[subset];rem_labels=data.y_train[remainder]
         values=representativeness_features(sub,sub_labels,rem,rem_labels)
+        confounds=nonstationarity_diagnostics(partition,data.y_train,data.train_metadata)
         row={"subject":subject,"residual_gap_pp":float(prior[subject]["residual_gap_pp"]),
              "post_weight_decay_residual_gap_pp":float(prior[subject]["post_control_residual_gap_pp"]),
              "subset_trial_count":len(subset),"remainder_trial_count":len(remainder),
@@ -56,6 +58,8 @@ def main():
         for name in FEATURES:row[name]=values[name]
         for key in ("centroid_shift_per_class","covariance_shift_per_class","coverage_distance_per_class"):
             row[key]=json.dumps(values[key])
+        for key,value in confounds.items():
+            row[key]=json.dumps(value) if isinstance(value,list) else value
         rows.append(row)
     result=analyze(rows)
     write_csv(a.output_dir/"subset_representativeness_subjects.csv",rows)
@@ -69,7 +73,20 @@ def main():
            "| Feature | Spearman | Kendall | LOSO min | LOSO median | LOSO max | Stable | Classification |",
            "|---|---:|---:|---:|---:|---:|---:|---|"]
     for r in result["associations"]:lines.append(f"| {r['feature_name']} | {r['spearman_rho']:.3f} | {r['kendall_tau']:.3f} | {r['loso_min_spearman_rho']:.3f} | {r['loso_median_spearman_rho']:.3f} | {r['loso_max_spearman_rho']:.3f} | {r['direction_stability_count']}/9 | {r['classification']} |")
-    lines += ["","Subset representativeness is a hypothesis candidate, not an established mechanism. A robust association authorizes an intervention study, not NAP."]
+    robust=[r["feature_name"] for r in result["associations"] if r["classification"]=="ROBUST_CANDIDATE_SIGNAL"]
+    imbalance=any(r["obvious_nonstationarity_imbalance"] for r in rows)
+    if robust and imbalance:
+        conclusion="REPRESENTATIVENESS_SIGNAL_WITH_NONSTATIONARITY_CONFOUND: a robust association exists, but available run/order diagnostics show substantial imbalance."
+    elif robust:
+        conclusion="A stable training-data-only association exists and is not obviously explained by available run/order provenance; causality remains unestablished."
+    else:
+        conclusion="The preregistered subset-representativeness audit did not identify a robust training-data-only signal capable of explaining the persistent small-sample residual failure."
+    lines += ["","## Skeptical Interpretation","",
+              "1. **Representation assumption.** The strongest unverified assumption is that fixed log-bandpower geometry adequately captures relevant representativeness. EEGNet may use spatial, phase, temporal, transient, or nonlinear structure absent here.",
+              "2. **Falsification rule.** The hypothesis is unsupported here when none of the four frozen features passes the unchanged robust-signal and LOSO gate; no pairwise subject rescue is permitted.",
+              "3. **Simpler explanation.** Run imbalance or recording nonstationarity may explain measurable subset/remainder differences. Run, chronological-position, and class-by-run diagnostics are reported descriptively and are not candidate features.",
+              f"4. **Strongest permitted conclusion.** {conclusion}","",
+              "The audit distinguishes measurable subset difference, association with residual failure, and causation. It can support only the second; only intervention can approach the third."]
     (a.output_dir/"subset_representativeness.md").write_text("\n".join(lines)+"\n",encoding="utf-8")
     print(f"Integrity pass: {result['integrity_pass']}")
     for r in result["associations"]:print(f"{r['feature_name']}: {r['classification']} (rho={r['spearman_rho']:.3f})")

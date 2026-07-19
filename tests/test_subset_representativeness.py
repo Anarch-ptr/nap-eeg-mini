@@ -10,7 +10,7 @@ import numpy as np
 
 from src.mechanism_audit import association, log_bandpower_features
 from src.subset_representativeness import (analyze, reconstruct_partition,
-    representativeness_features, shared_normalize)
+    nonstationarity_diagnostics, representativeness_features, shared_normalize)
 
 
 def make_root(mismatch=False):
@@ -64,6 +64,12 @@ class RepresentativenessTests(unittest.TestCase):
     def test_provenance_mismatch_invalid(self):
         t,r=make_root(True);self.addCleanup(t.cleanup)
         with self.assertRaises(RuntimeError):reconstruct_partition(r,1)
+    def test_nonstationarity_checks_are_descriptive(self):
+        import pandas as pd
+        partition={"training_pool_indices":list(range(8)),"subset_indices":[0,2,4,6],"remainder_indices":[1,3,5,7]}
+        metadata=pd.DataFrame({"run":["0","0","1","1","2","2","3","3"]})
+        result=nonstationarity_diagnostics(partition,np.array([0,0,1,1,2,2,3,3]),metadata)
+        self.assertIn("run_balance_tvd",result);self.assertNotIn("classification",result)
 
 
 if __name__=="__main__":unittest.main()

@@ -82,6 +82,33 @@ def representativeness_features(subset_features, subset_labels,
             "coverage_distance_per_class": coverages}
 
 
+def nonstationarity_diagnostics(partition: dict, labels, train_metadata) -> dict:
+    """Return frozen descriptive run/order balance checks, never candidates."""
+    if "run" not in train_metadata.columns or len(train_metadata) != len(labels):
+        raise RuntimeError("reliable run/order metadata unavailable")
+    subset = np.asarray(partition["subset_indices"], int)
+    remainder = np.asarray(partition["remainder_indices"], int)
+    labels = np.asarray(labels); runs = train_metadata["run"].astype(str).to_numpy()
+    run_levels = sorted(set(runs[partition["training_pool_indices"]]))
+    def distribution(indices, allowed):
+        counts = np.asarray([(runs[indices] == value).sum() for value in allowed], float)
+        return counts / counts.sum()
+    run_tvd = .5 * np.abs(distribution(subset, run_levels)-distribution(remainder, run_levels)).sum()
+    positions = np.arange(len(labels), dtype=float) / max(len(labels)-1, 1)
+    chronological_shift = abs(float(positions[subset].mean()-positions[remainder].mean()))
+    class_tvds = []
+    for class_id in range(4):
+        a = subset[labels[subset] == class_id]; b = remainder[labels[remainder] == class_id]
+        class_tvds.append(float(.5*np.abs(distribution(a, run_levels)-distribution(b, run_levels)).sum()))
+    class_run_tvd = float(np.mean(class_tvds))
+    obvious = bool(run_tvd >= .25 or chronological_shift >= .20 or class_run_tvd >= .30)
+    return {"run_balance_tvd": float(run_tvd),
+            "chronological_mean_position_shift": chronological_shift,
+            "class_by_run_balance_tvd": class_run_tvd,
+            "class_by_run_tvd_per_class": class_tvds,
+            "obvious_nonstationarity_imbalance": obvious}
+
+
 def analyze(rows: list[dict], integrity_errors=None) -> dict:
     """Apply the unchanged training-only association gate to four frozen features."""
     errors = list(integrity_errors or [])
