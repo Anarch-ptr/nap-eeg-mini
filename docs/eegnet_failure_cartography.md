@@ -348,3 +348,37 @@ The evidence chain is: Baseline → completed Artifact Audit → artifact-shortc
 hypothesis not supported → Failure Cartography → conditional Failure
 Attribution → conditional Minimal Intervention → only then potentially
 evidence-guided NAP. The latter steps are not authorized by this protocol.
+
+## Protocol Amendment 1 — Shift-Metric Schema Correction (2026-07-20)
+
+This amendment was triggered after the 81 checkpoint-inference cells completed
+but before scientific analysis, figures, effect-direction inspection, or
+outcome-state classification. The original frozen protocol above is preserved.
+
+1. **Invalid implementation assumption:** every key returned by
+   `representation_shift()` was assumed to be a shift metric.
+2. **Validity evidence:** the function also returned `feature_dimension`, a
+   layer metadata field. The runner consequently wrote 486 dimension rows into
+   `layer_shifts.csv`; analysis would have treated constant dimensions as shift
+   measurements, correlations, and metric-degeneracy evidence.
+3. **Why this is measurement failure:** feature dimension is not a
+   source-to-evaluation distance and cannot validly enter shift association or
+   metric-validity analysis. This is independent of whether any scientific
+   effect is strong, weak, positive, or null.
+4. **Exact amendment:** remove `feature_dimension` from
+   `representation_shift()` output. Dimension remains recorded correctly in
+   `representation_validity.csv`. The five frozen scientific shift metrics and
+   their definitions are unchanged.
+5. **Previously observed cells:** all 81 inference cells had completed. Only
+   matrix counts, integrity fields, and metric names were inspected; no shift
+   values, performance directions, correlations, figures, or candidate layers
+   were inspected before this amendment.
+6. **Bias risk:** low but nonzero because the amendment occurred after matrix
+   execution. The change is a type/schema correction that cannot favor a
+   layer, metric direction, budget, subject, or outcome state. Transparency is
+   maintained by this separate amendment and commit.
+
+Scientific interpretation remains stopped until corrected outputs pass the
+measurement-validity gate. The study is no longer described as operating under
+an untouched original preregistration; it operates under the original protocol
+plus this explicit amendment.

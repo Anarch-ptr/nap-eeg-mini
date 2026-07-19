@@ -147,7 +147,6 @@ def representation_shift(source: np.ndarray, evaluation: np.ndarray) -> dict:
     dimension = x.shape[1]; cx, cy = _covariance(x), _covariance(y)
     covariance_difference = float(np.linalg.norm(cx-cy, ord="fro"))
     return {
-        "feature_dimension": dimension,
         "feature_mean_shift": float(np.linalg.norm(x.mean(0)-y.mean(0))/np.sqrt(dimension)),
         "feature_variance_shift": float(np.linalg.norm(x.var(0)-y.var(0))/np.sqrt(dimension)),
         "covariance_difference": covariance_difference,

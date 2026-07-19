@@ -32,7 +32,7 @@ class CartographyTests(unittest.TestCase):
  def test_shift_zero_for_identical_samples(self):
   x=np.arange(24,dtype=float).reshape(6,4);m=representation_shift(x,x.copy());self.assertAlmostEqual(m["feature_mean_shift"],0.);self.assertAlmostEqual(m["coral_distance"],0.)
  def test_shift_metrics_are_finite(self):
-  rng=np.random.default_rng(4);m=representation_shift(rng.normal(size=(8,5)),rng.normal(size=(9,5)));self.assertTrue(all(np.isfinite(v) for v in m.values()))
+  rng=np.random.default_rng(4);m=representation_shift(rng.normal(size=(8,5)),rng.normal(size=(9,5)));self.assertEqual(set(m),{"feature_mean_shift","feature_variance_shift","covariance_difference","coral_distance","rbf_mmd2"});self.assertTrue(all(np.isfinite(v) for v in m.values()))
  def test_mismatched_width_rejected(self):
   with self.assertRaises(ValueError):representation_shift(np.ones((3,2)),np.ones((4,3)))
  def test_frozen_split_guard(self):
