@@ -1,5 +1,11 @@
 # NAP-A Decision Gate
 
+> **Phase-local scope note:** This gate records the decision immediately after
+> the Artifact Audit. Its uncertainty-aware reframe was a candidate question,
+> not an endorsed architecture plan. Later robustness and mechanism audits did
+> not establish evidence sufficient to authorize NAP; the current Architecture
+> Stop Rule remains active.
+
 ## 1. Original Hypothesis
 
 The original NAP-A motivation assumed that class-correlated artifact information creates a shortcut dependency in the EEGNet baseline and that artifact-aware suppression would consequently improve decoding reliability.

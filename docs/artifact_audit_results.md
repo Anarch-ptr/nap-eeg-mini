@@ -1,5 +1,11 @@
 # Artifact Audit Final Results
 
+> **Phase-local scope note:** The options and recommendation below record the
+> decision available at the end of the Artifact Audit. Subsequent robustness,
+> covariance, Failure Cartography, and instability-reliability work did not
+> establish an actionable mechanism. The project's current Architecture Stop
+> Rule remains active, and no NAP direction is currently authorized.
+
 ## 1. Research Question
 
 The Artifact Audit asked:

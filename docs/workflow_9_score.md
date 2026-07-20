@@ -1,5 +1,11 @@
 # NAP-EEG-Mini 9-Score Workflow
 
+> **Historical workflow note:** This document records the project's original
+> staged plan. Its NAP-A design and evaluation stages were conditional, not
+> authorized commitments. The completed evidence chain did not satisfy that
+> condition; the current status is the evidence freeze summarized in the
+> README and `docs/eegnet_instability_reliability_review.md`.
+
 ## Project Goal
 
 The goal of **NAP-EEG-Mini** is to upgrade the current artifact-audited EEG decoding demo into a reproducible, reliability-first EEG decoding research project.

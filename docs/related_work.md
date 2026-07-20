@@ -1,5 +1,12 @@
 # Related Work and Project Positioning
 
+> **Historical positioning note:** This document captures the literature
+> framing used before the formal audits were completed. Later evidence did not
+> support selective artifact-shortcut dependency and did not establish a
+> mechanism that authorizes NAP-A. NAP-A was not implemented. The current
+> contribution is the completed falsification and reliability evidence chain
+> summarized in the README and the final instability-reliability review.
+
 ## 1. EEG Artifact Removal
 
 Electroencephalography (EEG) recordings are vulnerable to non-neural contamination, including ocular, muscular, cardiac, motion-related, and environmental artifacts. Traditional EEG pipelines often rely on preprocessing methods such as filtering, regression-based correction, Independent Component Analysis (ICA), Canonical Correlation Analysis (CCA), and other blind source separation methods.
