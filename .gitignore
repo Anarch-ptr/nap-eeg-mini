@@ -247,6 +247,7 @@ results/**/resolved_config.yaml
 # Temporary results
 results/raw/
 results/tmp/
+results/external_boundary_recon/
 
 # Local environment
 .env
