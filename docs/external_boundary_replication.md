@@ -4,7 +4,8 @@
 
 **Scientific execution status:** No Phase A scientific results exist.
 
-**Dataset-specific status:** `PENDING_RAW_METADATA_VERIFICATION`
+**Candidate-specific raw metadata status:** see Section 20; scientific
+feasibility remains `PENDING_HUMAN_DECISION`.
 
 This document defines a possible new research project. It is not a mandatory
 continuation of the completed NAP-EEG-Mini evidence chain, and it does not
@@ -282,8 +283,8 @@ is still required.
 | Documentation status | `DOCUMENTATION_ELIGIBLE` |
 | Provisional tier | `TIER_1_NEAR_DIRECT_REPLICATION` |
 | Raw reconnaissance priority | `PRIMARY` |
-| Raw metadata status | `PENDING_RAW_METADATA_VERIFICATION` |
-| Replication feasibility | `TO_BE_VERIFIED` |
+| Raw metadata status | `RAW_METADATA_VERIFIED` |
+| Replication feasibility | `PENDING_HUMAN_DECISION` |
 
 Documentation-level strengths:
 
@@ -305,7 +306,9 @@ Unresolved issues requiring raw/native provenance reconnaissance:
 - whether independently labeled trials can support the intended cross-session
   protocol.
 
-None of these points is raw-metadata verified.
+These were unresolved at documentation screening time; Section 20 records the
+subsequent cohort-wide raw-metadata verification without rewriting that earlier
+screening stage.
 
 #### BNCI2015-001
 
@@ -315,8 +318,8 @@ None of these points is raw-metadata verified.
 | Documentation status | `DOCUMENTATION_ELIGIBLE` |
 | Provisional tier | `TIER_1_NEAR_DIRECT_REPLICATION` |
 | Raw reconnaissance priority | `SECONDARY` |
-| Raw metadata status | `PENDING_RAW_METADATA_VERIFICATION` |
-| Replication feasibility | `TO_BE_VERIFIED` |
+| Raw metadata status | `RAW_METADATA_VERIFIED` |
+| Replication feasibility | `PENDING_HUMAN_DECISION` |
 
 Documentation-level strengths:
 
@@ -811,3 +814,133 @@ original, native/raw, and framework views needed to resolve dataset identities
 and physical-session semantics. It must not train models, run inference,
 calculate performance or reliability metrics, freeze scientific conclusions,
 or change the protocol status automatically.
+
+## 20. Raw metadata / provenance reconnaissance
+
+This section records engineering observations only. The protocol remains
+`DRAFT_PRE_EXECUTION_PROTOCOL`; neither candidate is classified
+`REPLICATION_FEASIBLE`, and no final dataset or session-role decision has been
+made. No filtering, resampling, normalization, epoch construction, model
+loading, inference, or scientific metric calculation was performed.
+
+### 20.1 Lee2019_MI
+
+The framework exposes 54 subjects, and all 54 were inspected. Raw metadata is
+`RAW_METADATA_VERIFIED`; provenance is `ABSTRACTION_RENAMING_ONLY`. Under the
+inspected native metadata and MOABB representation,
+`NO_COHORT_WIDE_STRUCTURAL_BLOCKER_OBSERVED`. This is structural verification,
+not a claim that the dataset is unbiased, scientifically reliable, or expected
+to reproduce the BCI2a result.
+
+The following structure was observed for every subject:
+
+| Physical session | Native phase | Native events | Native label-vector entries | Label interpretation |
+|---|---|---:|---:|---|
+| S1 | `offline_train` | 100 | 100 | ground-truth labels present |
+| S1 | `online_test` | 100 | 100 | values exist, but are not documented as online-phase ground truth |
+| S2 | `offline_train` | 100 | 100 | ground-truth labels present |
+| S2 | `online_test` | 100 | 100 | values exist, but are not documented as online-phase ground truth |
+
+The framework exposes physical S1/S2 as session IDs `0`/`1` and exposes
+`1train` and `4test` within each session. Each framework run contains 100 event
+markers, split 50/50 between codes 1 and 2; the class mapping is right hand = 1
+and left hand = 2. Sampling rate, channel count, and channel order were
+consistent across all subjects. The observed sample rate is 1,000 Hz.
+
+All 54 subjects expose ground-truth labels in both S1 offline `1train` and S2
+offline `1train`, so `OFFLINE_COMMON_SESSION_PAIR_AVAILABLE` holds for 54/54.
+This does not freeze S1 as training or S2 as evaluation. Online `4test` exposes
+events and label-like values, but its documentation states that MI online runs
+do not have trial ground truth. Online status therefore remains
+`ONLINE_LABEL_SEMANTICS_UNRESOLVED` for both sessions of every subject.
+
+The structural trial-retention waterfall is identical across all 216
+subject/session/phase cells:
+
+```text
+documented = 100
+native observed = 100
+framework observed = 100
+structurally eligible = 100
+scientifically usable = NOT_YET_DETERMINED
+trial-loss classification = NO_OBSERVED_LOSS
+```
+
+No subject has a missing session, missing run, native/framework count mismatch,
+sampling-rate anomaly, channel-count/order anomaly, duplicated structural ID,
+ambiguous trial identity, or unresolved session mapping. In total, 21,600
+structural trial identities were checked. Scientifically usable trial counts
+remain `NOT_YET_DETERMINED`. Whether the two labeled offline sessions should
+become training/evaluation roles remains `PENDING_HUMAN_DECISION`.
+
+### 20.2 BNCI2015-001
+
+All 12 framework-listed subjects were inspected. Every observed native session
+contains one run with 200 events (100 right-hand and 100 feet), and every
+corresponding framework session retains all 200 events. The observed sample
+rate is 512 Hz. Structurally eligible count is therefore 200 per session;
+scientifically usable count remains `NOT_YET_DETERMINED`.
+
+| Subjects | Native sessions | Framework sessions | Physical mapping |
+|---|---|---|---|
+| 1–7, 12 | A, B | `0A`, `1B` | S1, S2 |
+| 8–11 | A, B, C | `0A`, `1B`, `2C` | S1, S2, S3 |
+
+Common-pair coverage is: S1 = 12 subjects, S2 = 12, S3 = 4, verified S1+S2
+= 12, and verified S1+S2+S3 = 4. Thus
+`PRIMARY_COMMON_SESSION_PAIR_STRUCTURALLY_POSSIBLE`, while the session-role
+decision remains `PENDING_HUMAN_DECISION`. Available loader metadata and local
+documentation do not establish why S3 was assigned, so its status is
+`S3_ASSIGNMENT_CONDITION_UNKNOWN`. S3 is not treated as exchangeable or as an
+automatic replicate.
+
+Native suffixes and framework IDs preserve chronological A/B/C identity in all
+observed subjects, and deterministic unique trial IDs can be reconstructed.
+There is no observed native-to-framework trial loss. However, the MOABB dataset
+object declares two sessions per subject while the same loader exposes a third
+session for subjects 8–11. Raw metadata is therefore
+`RAW_METADATA_VERIFIED`, but provenance is conservatively classified
+`ABSTRACTION_SEMANTIC_MISMATCH` rather than `PROVENANCE_CONSISTENT`. This class
+metadata conflict does not silently exclude three-session subjects and does not
+by itself invalidate the common S1/S2 pair.
+
+Human review records BNCI2015-001 as an active Phase A candidate. The common
+S1/S2 structure across all 12 subjects is
+`STRUCTURALLY_ACCEPTABLE_FOR_CONTINUED_CONSIDERATION`, but physical homogeneity
+has not been established. Subjects 8–11 must not be excluded solely because
+they have S3, and S3 must not enter a primary analysis automatically. Any S3
+use would require a separately defined secondary analysis.
+
+### 20.3 Cache-path provenance
+
+The initial reconnaissance passed the absolute Windows path
+`E:\nap-eeg-mini\data\external_recon` to MOABB 1.5.0. Its downloader sanitized
+the colon in the full destination, converting `E:` to `E-`; the resulting
+relative path was then resolved under the working directory as
+`E:\nap-eeg-mini\E-\nap-eeg-mini\data\external_recon`. The reconnaissance
+script now passes the repository-relative argument `data\external_recon` while
+setting the effective process-level MNE/MOABB root to the intended absolute
+directory. New files therefore resolve under
+`E:\nap-eeg-mini\data\external_recon`.
+
+The old nested cache was not moved, deleted, renamed, or redownloaded. Lee
+subject 1 was reused from that read-only legacy root; missing subjects were
+downloaded only to the corrected root. Cache handling is engineering
+provenance, not scientific evidence.
+
+### 20.4 Interpretation and next gate
+
+The machine-readable artifacts contain the subject-level availability matrix,
+per-run retention waterfall, label counts, channel metadata, source paths, and
+the checked trial-identity status and counts. They contain no EEG arrays or
+scientific results.
+
+Lee2019_MI now has sufficient cohort-wide structural provenance to enter review
+alongside BNCI2015-001. `RAW_METADATA_VERIFIED` is not
+`REPLICATION_FEASIBLE`, and neither is `FINAL_PHASE_A_DATASET`.
+
+The exact next allowed action is `HUMAN_COMPARATIVE_DATASET_SELECTION_REVIEW`
+using the two candidate provenance records. That review must not collapse the
+candidates into a numerical score or select based on expected scientific
+results. Only humans may select a candidate and resolve the pending scientific
+protocol decisions in Section 18.
