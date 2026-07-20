@@ -344,21 +344,33 @@ Optimizer-update matching
 Synthetic tests for protocol integrity
 Git commits to freeze experimental definitions before observing formal outcomes
 
-The final repository test suite contains:
+The evidence-freeze repository test suite contains:
 
-207 passing tests
+246 passing tests
 
 ## Final Project Status
 
-Completed scientific chain: archived through the heterogeneous covariance
-intervention STOP gate.
+Completed scientific chain: archived through the zero-training EEGNet Training
+Instability and Measurement Reliability Review.
 
-Current engineering/research phase: the complete 81-cell EEGNet Failure
-Cartography audit has finished. Its primary classification is State 4,
-seed-sensitive or statistically unstable failure, with subject heterogeneity
-and no stable layer localization as secondary characteristics. This does not
-reopen the artifact hypothesis or authorize NAP; the Architecture Stop Rule
-remains active.
+The complete 81-cell Failure Cartography audit found State 4, seed-sensitive or
+statistically unstable failure, with subject heterogeneity and no stable layer
+localization. The subsequent zero-training review found genuine seed-dependent
+predictive/model-state variation together with finite-sample sensitivity in
+representation-shift measurements. Its conservative classifications are
+`MIXED_MODEL_AND_MEASUREMENT_INSTABILITY`,
+`NO_MECHANISTIC_EXPLANATION_ESTABLISHED`, and
+`UNRESOLVED_DUE_TO_SEED_SAMPLE_LIMITATION`. Seed sufficiency is
+`SUFFICIENCY_C`; the preregistered multi-seed replication trigger was
+`NOT_SATISFIED`.
+
+The project therefore evolved from a plausible artifact-shortcut architecture
+hypothesis toward falsification-oriented diagnostic auditing. The evidence did
+not identify a reproducible mechanism sufficient to justify an evidence-guided
+NAP intervention. This does not prove that NAP is universally unnecessary or
+that EEGNet has no fixable weakness. Related future work would constitute a new
+research question with separate motivation and preregistration, not an automatic
+continuation of this evidence chain. The Architecture Stop Rule remains active.
 
 Robust small-sample failure: Supported
 
@@ -378,6 +390,12 @@ Universal covariance intervention effect: Not supported
 
 General causal mechanism: Unidentified
 
+Seed-dependent predictive variation: Supported under seeds 42/43/44
+
+Representation-shift finite-sample sensitivity: Supported under the reviewed estimators
+
+Multi-seed replication trigger: Not satisfied
+
 NAP justification: Not established
 
 NAP implementation: No
@@ -387,6 +405,8 @@ NAP implementation: No
 The complete scientific evidence chain is documented in:
 
 docs/final_scientific_synthesis.md
+
+docs/eegnet_instability_reliability_review.md
 
 Study limitations are documented in:
 

@@ -1,5 +1,12 @@
 # Final Scientific Synthesis and Stop-Gate
 
+> **Scope note:** This synthesis freezes the evidence chain through the spatial
+> covariance intervention stage. It is preserved as a historical scientific
+> checkpoint, not the current project-final review. Failure Cartography and the
+> subsequent instability-reliability review extend the chain; the current
+> final status is summarized in the README and
+> `docs/eegnet_instability_reliability_review.md`.
+
 ## A. Initial hypothesis
 
 The initial hypothesis was that the sealed EEGNet baseline exploited an
