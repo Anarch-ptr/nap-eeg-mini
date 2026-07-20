@@ -266,6 +266,184 @@ reconnaissance code must be isolated under `scripts/recon/`, must not modify the
 training pipeline, and must not import BCI2a, EEGNet, Failure Cartography, or
 Instability Review runners. This draft creates no reconnaissance code.
 
+### 3.6 Documentation Screening Results
+
+The following classifications record the first documentation-level candidate
+screening. They are based on approved documentation-screening conclusions only.
+They do not establish `RAW_METADATA_VERIFIED` or `REPLICATION_FEASIBLE`, and
+they do not select the final Phase A dataset. Raw/native provenance inspection
+is still required.
+
+#### Lee2019_MI
+
+| Field | Documentation-level record |
+|---|---|
+| Dataset | `Lee2019_MI` |
+| Documentation status | `DOCUMENTATION_ELIGIBLE` |
+| Provisional tier | `TIER_1_NEAR_DIRECT_REPLICATION` |
+| Raw reconnaissance priority | `PRIMARY` |
+| Raw metadata status | `PENDING_RAW_METADATA_VERIFICATION` |
+| Replication feasibility | `TO_BE_VERIFIED` |
+
+Documentation-level strengths:
+
+- relatively large subject population;
+- documented multiple-session structure;
+- Motor Imagery task;
+- subject-specific external replication appears conceptually possible;
+- sufficient documented trial volume for a limited-data protocol appears
+  plausible.
+
+Unresolved issues requiring raw/native provenance reconnaissance:
+
+- exact physical-session semantics;
+- exact inter-session timing;
+- offline versus online phase semantics;
+- which trials contain ground-truth labels;
+- native trial identity;
+- MOABB session/run mapping;
+- whether independently labeled trials can support the intended cross-session
+  protocol.
+
+None of these points is raw-metadata verified.
+
+#### BNCI2015-001
+
+| Field | Documentation-level record |
+|---|---|
+| Dataset | `BNCI2015-001` |
+| Documentation status | `DOCUMENTATION_ELIGIBLE` |
+| Provisional tier | `TIER_1_NEAR_DIRECT_REPLICATION` |
+| Raw reconnaissance priority | `SECONDARY` |
+| Raw metadata status | `PENDING_RAW_METADATA_VERIFICATION` |
+| Replication feasibility | `TO_BE_VERIFIED` |
+
+Documentation-level strengths:
+
+- subject-specific Motor Imagery dataset;
+- multiple documented sessions;
+- substantial trial volume per session appears compatible with limited-data
+  analysis;
+- useful candidate for comparing original experiment semantics against the
+  MOABB abstraction.
+
+Unresolved issues requiring raw/native provenance reconnaissance:
+
+- heterogeneous two-session/three-session structure across subjects;
+- exact subject-level session availability;
+- physical inter-session timing;
+- native run/session identity;
+- exact MOABB session mapping;
+- whether a common Session-1-to-Session-2 primary estimand is feasible for all
+  eligible subjects.
+
+The two-session/three-session discrepancy is not resolved by documentation
+screening.
+
+#### Zhou2016
+
+| Field | Documentation-level record |
+|---|---|
+| Dataset | `Zhou2016` |
+| Documentation status | `DOCUMENTATION_ELIGIBLE` |
+| Provisional tier | `TIER_1_NEAR_DIRECT_REPLICATION` |
+| Additional limitation | `LOW_SUBJECT_COUNT_LIMITATION` |
+| Raw reconnaissance priority | `RESERVE` |
+| Raw metadata status | `PENDING_RAW_METADATA_VERIFICATION` |
+| Replication feasibility | `TO_BE_VERIFIED` |
+
+Documentation-level strengths:
+
+- genuine multi-session Motor Imagery structure;
+- strong physical cross-session relevance;
+- useful candidate for testing session-boundary robustness.
+
+The principal documentation-level limitation is the very small subject
+population. This does not by itself make the dataset scientifically ineligible,
+but it prevents promotion to the primary population-level replication
+candidate.
+
+Unresolved issues requiring raw/native provenance reconnaissance:
+
+- native trial/session/run provenance;
+- exact usable trial counts;
+- native versus derived/BIDS representation;
+- framework-abstraction consistency.
+
+#### Shin2017A
+
+| Field | Documentation-level record |
+|---|---|
+| Dataset | `Shin2017A` |
+| Documentation status | `DOCUMENTATION_ELIGIBLE` |
+| Provisional tier | `TIER_2_BOUNDARY_REPLICATION` |
+| Raw reconnaissance priority | `NOT_FIRST_ROUND` |
+| Raw metadata status | `PENDING_RAW_METADATA_VERIFICATION` |
+| Replication feasibility | `TO_BE_VERIFIED` |
+
+Documentation-level strengths:
+
+- multiple MI recording sessions;
+- useful subject population.
+
+Important documented or unresolved protocol differences are:
+
+- low trial count per MI session;
+- strong prior preprocessing in the released data;
+- ICA/EOG-related preprocessing history;
+- uncertain physical inter-session interval;
+- limited-data fractions may create a substantially different optimization
+  regime.
+
+These differences do not make `Shin2017A` scientifically useless. They make it
+better suited to a later boundary-replication question than to the first
+near-direct Phase A candidate.
+
+#### Provisional raw-reconnaissance shortlist
+
+`RAW_METADATA_RECON_SHORTLIST` is:
+
+1. **Primary:** `Lee2019_MI`;
+2. **Secondary:** `BNCI2015-001`;
+3. **Reserve:** `Zhou2016`;
+4. **Boundary-only for current Phase A:** `Shin2017A`.
+
+This shortlist is provisional. It does not mean that `Lee2019_MI` is the final
+selected dataset or that `BNCI2015-001` is replication-feasible. It determines
+only which candidates should receive the first raw metadata/provenance
+reconnaissance.
+
+For `Lee2019_MI` and `BNCI2015-001`, future reconnaissance must explicitly
+compare:
+
+1. `ORIGINAL_EXPERIMENT_DEFINITION`;
+2. `NATIVE_RAW_FILE_STRUCTURE`;
+3. `FRAMEWORK_ABSTRACTION`.
+
+It may later assign one of `PROVENANCE_CONSISTENT`,
+`ABSTRACTION_RENAMING_ONLY`, `ABSTRACTION_SEMANTIC_MISMATCH`,
+`PROVENANCE_INCOMPLETE`, or `REPLICATION_BLOCKING_MISMATCH`. No such provenance
+classification is assigned by documentation screening.
+
+The following physical-session rules remain binding:
+
+```text
+Run != Session
+Train/Test split != Cross-session split
+Multiple recording blocks != automatically independent sessions
+MOABB session label != automatically physical-session ground truth
+```
+
+Raw reconnaissance must establish physical-session semantics before any
+session-role mapping is frozen.
+
+External replication does not require exact equality with BCI2a in class count,
+channel count, sampling rate, or trial count. The primary target remains the
+within-dataset reliability response under limited-data and cross-session
+conditions, not direct absolute accuracy comparison between datasets. The
+native-task/common-class estimand, fraction-matched/absolute-count design, and
+final session-role mapping remain `PENDING_HUMAN_DECISION`.
+
 ## 4. Primary scientific estimand
 
 The primary estimand is:
@@ -619,3 +797,17 @@ The following items are `PENDING_HUMAN_DECISION`:
 The protocol may become `FROZEN_PRE_EXECUTION_PROTOCOL` only after raw metadata
 is verified, the candidate is classified `REPLICATION_FEASIBLE`, and every item
 above is resolved before scientific execution.
+
+## 19. Exact next permitted step
+
+The next permitted step after this documentation update is **raw metadata /
+provenance reconnaissance** for the first-round candidates, in this order:
+
+1. `Lee2019_MI`;
+2. `BNCI2015-001`.
+
+That future work must remain engineering/provenance-only. It may inspect the
+original, native/raw, and framework views needed to resolve dataset identities
+and physical-session semantics. It must not train models, run inference,
+calculate performance or reliability metrics, freeze scientific conclusions,
+or change the protocol status automatically.
