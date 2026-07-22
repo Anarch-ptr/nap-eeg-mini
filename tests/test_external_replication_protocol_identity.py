@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import subprocess
 import unittest
 from dataclasses import fields
 from pathlib import Path
@@ -51,7 +52,17 @@ class ProtocolIdentityTests(unittest.TestCase):
         self.assertTrue(any("PROTOCOL_SHA256" in reason for reason in result.failure_reasons))
 
     def test_current_implementation_identity_is_separate_field(self):
-        self.assertEqual(self.result.implementation_commit, FROZEN_PROTOCOL_V1.freeze_commit)
+        current_head = subprocess.check_output(
+            ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+        self.assertEqual(self.result.implementation_commit, current_head)
+        self.assertEqual(self.result.freeze_commit, FROZEN_PROTOCOL_V1.freeze_commit)
+        if current_head != FROZEN_PROTOCOL_V1.freeze_commit:
+            self.assertNotEqual(
+                self.result.implementation_commit,
+                self.result.freeze_commit,
+            )
         names = {field.name for field in fields(type(self.result))}
         self.assertIn("implementation_commit", names)
         self.assertIn("freeze_commit", names)
