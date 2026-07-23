@@ -13,6 +13,7 @@ import os
 import platform
 import shutil
 import subprocess
+import struct
 import sys
 import urllib.request
 from dataclasses import asdict, dataclass
@@ -39,6 +40,10 @@ RECONSTRUCTION_SCHEMA = "EXTERNAL_BOUNDARY_REPLICATION_ENVIRONMENT_RECONSTRUCTIO
 BOOTSTRAP_METHOD = "PYTHON_VENV_ENSUREPIP"
 HASH_ENFORCEMENT_AT_INSTALL = "PREVERIFIED_EXACT_ARTIFACT_PATHS"
 EXPECTED_ARTIFACT_COUNT = 62
+SUPPORTED_ARCHITECTURE_ALIASES = {
+    "amd64": "AMD64",
+    "x86_64": "AMD64",
+}
 
 
 class ReconstructionIntegrityError(RuntimeError):
@@ -116,6 +121,129 @@ def load_approved_artifacts() -> tuple[Path, tuple[ApprovedArtifact, ...]]:
     ):
         raise ReconstructionIntegrityError("APPROVED_ARTIFACT_SET_INVALID")
     return root, artifacts
+
+
+def _load_committed_platform_contract() -> dict[str, str]:
+    root = resolve_production_repository_root()
+    manifest_path = root / ENVIRONMENT_MANIFEST_RELATIVE_PATH
+    manifest_bytes = manifest_path.read_bytes()
+    if _sha256_bytes(manifest_bytes) != EXPECTED_ENVIRONMENT_MANIFEST_SHA256:
+        raise ReconstructionIntegrityError("ENVIRONMENT_MANIFEST_SHA256_MISMATCH")
+    document = parse_strict_json(manifest_bytes)
+    if not isinstance(document, dict):
+        raise ReconstructionIntegrityError("ENVIRONMENT_MANIFEST_STRUCTURE_INVALID")
+    platform_contract = document.get("canonical_platform")
+    if not isinstance(platform_contract, dict):
+        raise ReconstructionIntegrityError("CANONICAL_PLATFORM_MISSING")
+    required = {
+        "abi_tag",
+        "machine_architecture",
+        "os",
+        "platform_tag",
+        "python_implementation",
+        "python_tag",
+        "python_version",
+    }
+    missing = sorted(required - set(platform_contract))
+    if missing:
+        raise ReconstructionIntegrityError(
+            "CANONICAL_PLATFORM_FIELDS_MISSING: " + ",".join(missing)
+        )
+    return {key: str(platform_contract[key]) for key in required}
+
+
+def _normalize_architecture(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in SUPPORTED_ARCHITECTURE_ALIASES:
+        raise ReconstructionIntegrityError(
+            f"REFERENCE_ARCHITECTURE_UNSUPPORTED: {value!r}"
+        )
+    return SUPPORTED_ARCHITECTURE_ALIASES[normalized]
+
+
+def _platform_observations() -> dict[str, object]:
+    return {
+        "os_name": os.name,
+        "sys_platform": sys.platform,
+        "platform_system": platform.system(),
+        "machine": platform.machine(),
+        "python_implementation": platform.python_implementation(),
+        "python_version": platform.python_version(),
+        "python_cache_tag": sys.implementation.cache_tag,
+        "pointer_bits": 8 * struct.calcsize("P"),
+    }
+
+
+def enforce_reference_platform_compatibility(
+    artifacts: Sequence[ApprovedArtifact],
+) -> dict[str, object]:
+    """Reject non-reference runtimes and incompatible wheels before pip."""
+
+    contract = _load_committed_platform_contract()
+    observations = _platform_observations()
+    expected_machine = _normalize_architecture(contract["machine_architecture"])
+    expected = {
+        "os_name": "nt",
+        "sys_platform": "win32",
+        "platform_system": contract["os"],
+        "machine": expected_machine,
+        "python_implementation": contract["python_implementation"],
+        "python_version": contract["python_version"],
+        "python_cache_tag": "cpython-" + contract["python_tag"].removeprefix("cp"),
+        "pointer_bits": 64,
+    }
+    observed_machine = _normalize_architecture(str(observations["machine"]))
+    observations = {**observations, "machine": observed_machine}
+    mismatches = {
+        key: {"expected": expected[key], "observed": value}
+        for key, value in observations.items()
+        if value != expected[key]
+    }
+    if mismatches:
+        raise ReconstructionIntegrityError(
+            "REFERENCE_PLATFORM_MISMATCH: "
+            + json.dumps(mismatches, sort_keys=True)
+        )
+
+    from packaging.tags import sys_tags
+    from packaging.utils import InvalidWheelFilename, parse_wheel_filename
+
+    compatible_tags = frozenset(sys_tags())
+    incompatible: list[str] = []
+    torch_identity_seen = False
+    for artifact in artifacts:
+        if artifact.normalized_name == "torch":
+            torch_identity_seen = (
+                artifact.version == "2.12.1+cu130"
+                and contract["python_tag"] in artifact.filename
+                and contract["abi_tag"] in artifact.filename
+                and contract["platform_tag"] in artifact.filename
+            )
+        try:
+            _name, _version, _build, wheel_tags = parse_wheel_filename(
+                artifact.filename
+            )
+        except InvalidWheelFilename as exc:
+            raise ReconstructionIntegrityError(
+                f"APPROVED_WHEEL_FILENAME_INVALID: {artifact.filename}"
+            ) from exc
+        if compatible_tags.isdisjoint(wheel_tags):
+            incompatible.append(artifact.filename)
+    if incompatible:
+        raise ReconstructionIntegrityError(
+            "APPROVED_WHEEL_TAG_INCOMPATIBLE: " + ",".join(incompatible)
+        )
+    if len(artifacts) == EXPECTED_ARTIFACT_COUNT and not torch_identity_seen:
+        raise ReconstructionIntegrityError("TORCH_WHEEL_IDENTITY_MISMATCH")
+    return {
+        **observations,
+        "manifest_sha256": EXPECTED_ENVIRONMENT_MANIFEST_SHA256,
+        "python_tag": contract["python_tag"],
+        "abi_tag": contract["abi_tag"],
+        "platform_tag": contract["platform_tag"],
+        "compatible_wheel_count": len(artifacts),
+        "compatibility_status": "PASS_FROZEN_WINDOWS_AMD64_CP312",
+    }
 
 
 def download_approved_artifacts(
@@ -312,6 +440,7 @@ def install_preverified_artifacts(
 ]:
     """Verify the complete candidate set before making exactly one pip call."""
 
+    enforce_reference_platform_compatibility(artifacts)
     inventory, verifications = verify_wheelhouse(wheelhouse, artifacts)
     argv = build_install_argv(venv_python, wheelhouse, artifacts)
     completed, evidence = _command_evidence(
@@ -401,6 +530,17 @@ def _required_test_commands(python: Path) -> dict[str, tuple[str, ...]]:
     }
 
 
+def _isolated_startup_argv(root: Path, python: Path) -> tuple[str, ...]:
+    return (
+        str(python.resolve()),
+        "-I",
+        "-E",
+        "-B",
+        "-S",
+        str((root / "scripts" / "verify_external_replication_startup.py").resolve()),
+    )
+
+
 def run_clean_reconstruction(
     wheelhouse: Path,
     evidence_output: Path,
@@ -429,6 +569,7 @@ def run_clean_reconstruction(
     ):
         raise ReconstructionIntegrityError("BOOTSTRAP_PYTHON_IDENTITY_MISMATCH")
 
+    platform_compatibility = enforce_reference_platform_compatibility(artifacts)
     bootstrap_argv = (str(bootstrap), "-m", "venv", str(venv.resolve()))
     bootstrap_completed, bootstrap_command = _command_evidence(
         bootstrap_argv, cwd=root
@@ -450,21 +591,13 @@ def run_clean_reconstruction(
     if pip_check_completed.returncode:
         raise ReconstructionIntegrityError("PIP_CHECK_FAILED")
 
-    startup_code = (
-        "import json;"
-        "from dataclasses import asdict;"
-        "from src.external_replication.startup import "
-        "enforce_pre_scientific_startup_or_abort;"
-        "print(json.dumps(asdict(enforce_pre_scientific_startup_or_abort()),"
-        "sort_keys=True))"
-    )
     git_safe_environment = {
         "GIT_CONFIG_COUNT": "1",
         "GIT_CONFIG_KEY_0": "safe.directory",
         "GIT_CONFIG_VALUE_0": str(root.resolve()).replace("\\", "/"),
     }
     startup_completed, startup_command = _command_evidence(
-        (str(venv_python.resolve()), "-c", startup_code),
+        _isolated_startup_argv(root, venv_python),
         cwd=root,
         environment_overrides=git_safe_environment,
     )
@@ -523,6 +656,7 @@ def run_clean_reconstruction(
             "description": "FRESH_LOCAL_CLONE_EXECUTING_ITS_OWN_SOURCE_MODULE",
             "canonical_repository_venv_modified": False,
         },
+        "reference_platform_compatibility": platform_compatibility,
         "bootstrap": {
             "method": BOOTSTRAP_METHOD,
             "command": bootstrap_command,
@@ -592,6 +726,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     _root, artifacts = load_approved_artifacts()
+    enforce_reference_platform_compatibility(artifacts)
     if args.download:
         download_approved_artifacts(args.wheelhouse, artifacts)
     run_clean_reconstruction(

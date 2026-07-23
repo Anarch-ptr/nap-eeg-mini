@@ -503,9 +503,8 @@ def _current_environment_snapshot(root: Path, lock: EnvironmentLockSpec) -> Envi
             observed = None
         versions.append((distribution, observed))
     try:
-        from .protocol_identity import _text
-
-        implementation_commit = _text(root, "rev-parse", "HEAD")
+        protocol_identity = verify_protocol_identity(root)
+        implementation_commit = protocol_identity.implementation_commit
     except RuntimeError:
         implementation_commit = None
     return EnvironmentSnapshot(
