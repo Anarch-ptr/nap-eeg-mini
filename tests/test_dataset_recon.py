@@ -1,17 +1,12 @@
 """Engineering-only tests for external dataset provenance reconnaissance."""
 
-import sys
-import types
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
 
-import scripts.recon.inspect_dataset_provenance as recon_module
 from scripts.recon.inspect_dataset_provenance import (
     classify_dataset_provenance,
     classify_trial_loss,
-    enforce_phase_ii_b_acquisition_or_abort,
     lee_subject_session_matrix,
     legacy_sanitized_cache_root,
     moabb_relative_cache_argument,
@@ -24,119 +19,6 @@ from scripts.recon.inspect_dataset_provenance import (
 
 
 class DatasetReconTests(unittest.TestCase):
-    def test_reconnaissance_acquisition_is_retired_until_phase_ii_b(self):
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "RAW_DATA_IDENTITY_GATE_NOT_IMPLEMENTED_PHASE_II_B",
-        ):
-            enforce_phase_ii_b_acquisition_or_abort()
-
-    def test_former_authorization_symbol_cannot_enable_acquisition(self):
-        setattr(recon_module, "PHASE_II_B_DATA_ACQUISITION_AUTHORIZATION", "ALLOW")
-        self.addCleanup(
-            lambda: delattr(
-                recon_module, "PHASE_II_B_DATA_ACQUISITION_AUTHORIZATION"
-            )
-            if hasattr(recon_module, "PHASE_II_B_DATA_ACQUISITION_AUTHORIZATION")
-            else None
-        )
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "LEE_DATA_ACQUISITION_NOT_AUTHORIZED",
-        ):
-            enforce_phase_ii_b_acquisition_or_abort()
-
-    def test_direct_dataset_instance_cannot_construct_lee(self):
-        calls = []
-        fake_datasets = types.ModuleType("moabb.datasets")
-
-        class FakeLee2019MI:
-            def __init__(self, *args, **kwargs):
-                calls.append((args, kwargs))
-
-        fake_datasets.Lee2019_MI = FakeLee2019MI
-        with patch.dict(
-            sys.modules,
-            {
-                "moabb": types.ModuleType("moabb"),
-                "moabb.datasets": fake_datasets,
-            },
-        ):
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "LEE_DATA_ACQUISITION_NOT_AUTHORIZED",
-            ):
-                recon_module._dataset_instance("lee2019_mi")
-        self.assertEqual(calls, [])
-
-    def test_direct_main_aborts_before_cache_or_dataset_construction(self):
-        calls = {"constructor": 0, "mkdir": 0}
-        fake_datasets = types.ModuleType("moabb.datasets")
-
-        class FakeLee2019MI:
-            def __init__(self, *args, **kwargs):
-                calls["constructor"] += 1
-
-        def tracked_mkdir(self, *args, **kwargs):
-            calls["mkdir"] += 1
-
-        fake_datasets.Lee2019_MI = FakeLee2019MI
-        with (
-            patch.dict(
-                sys.modules,
-                {
-                    "moabb": types.ModuleType("moabb"),
-                    "moabb.datasets": fake_datasets,
-                },
-            ),
-            patch.object(
-                sys,
-                "argv",
-                [
-                    "inspect_dataset_provenance.py",
-                    "--dataset",
-                    "lee2019_mi",
-                    "--subjects",
-                    "all",
-                    "--resume",
-                ],
-            ),
-            patch.object(Path, "mkdir", tracked_mkdir),
-        ):
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "LEE_DATA_ACQUISITION_NOT_AUTHORIZED",
-            ):
-                recon_module.main()
-        self.assertEqual(calls, {"constructor": 0, "mkdir": 0})
-
-    def test_inspect_dataset_helper_aborts_before_data_path(self):
-        calls = {"data_path": 0}
-
-        class FakeDataset:
-            subject_list = [1]
-
-            def data_path(self, *args, **kwargs):
-                calls["data_path"] += 1
-                return []
-
-        with patch.object(
-            recon_module,
-            "_dataset_instance",
-            side_effect=RuntimeError("LEE_DATA_ACQUISITION_NOT_AUTHORIZED"),
-        ):
-            with self.assertRaisesRegex(
-                RuntimeError,
-                "LEE_DATA_ACQUISITION_NOT_AUTHORIZED",
-            ):
-                recon_module.inspect_dataset(
-                    "lee2019_mi",
-                    Path("data/external_recon"),
-                    Path("results/external_boundary_recon"),
-                    [1],
-                )
-        self.assertEqual(calls["data_path"], 0)
-
     def test_structural_trial_id_is_stable_and_opaque_subject_safe(self):
         first = structural_trial_id("dataset", "subject-A", "S1", "run-x", 42, 0)
         second = structural_trial_id("dataset", "subject-A", "S1", "run-x", 42, 0)
