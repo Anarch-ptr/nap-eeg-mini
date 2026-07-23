@@ -89,7 +89,7 @@ class StructuralMetadata(str, Enum):
 class ExecutionFirewallStatus:
     protocol_identity_gate: str = "IMPLEMENTED"
     implementation_constants_conformance_gate: str = "IMPLEMENTED"
-    environment_enforcement_gate: str = "INCOMPLETE_UNTIL_PHASE_II_LOCK"
+    environment_enforcement_gate: str = "IMPLEMENTED_CURRENT_PROCESS_ONLY"
     raw_data_identity_gate: str = "NOT_IMPLEMENTED_PHASE_II"
     explicit_rng_ownership_gate: str = "FOUNDATION_IMPLEMENTED"
     outcome_blind_implementation_gate: str = "STRUCTURALLY_ENFORCED"

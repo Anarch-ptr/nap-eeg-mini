@@ -38,6 +38,10 @@ class ExecutionGateTests(unittest.TestCase):
     def test_default_mode_and_parameter_updates_disabled(self):
         self.assertEqual(DEFAULT_EXECUTION_MODE, ExecutionMode.OUTCOME_BLIND_STRUCTURAL_SMOKE)
         self.assertEqual(SCIENTIFIC_PARAMETER_UPDATE_AUTHORIZATION, ParameterUpdateAuthorization.DISABLED)
+        self.assertEqual(
+            FOUR_GATE_FIREWALL.environment_enforcement_gate,
+            "IMPLEMENTED_CURRENT_PROCESS_ONLY",
+        )
         self.assertEqual(FOUR_GATE_FIREWALL.raw_data_identity_gate, "NOT_IMPLEMENTED_PHASE_II")
         self.assertEqual(FOUR_GATE_FIREWALL.scientific_execution_authorization_gate, "DENY")
         self.assertEqual(SCIENTIFIC_STARTUP_GATE_ORDER[0], "PROTOCOL_IDENTITY_GATE")
