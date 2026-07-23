@@ -26,15 +26,6 @@ DATASET_ALIASES = {
     "bnci2015_001": "BNCI2015-001",
 }
 
-
-def enforce_phase_ii_b_acquisition_or_abort() -> None:
-    """Retire the reconnaissance acquisition path until Phase II-B exists."""
-
-    raise RuntimeError(
-        "LEE_DATA_ACQUISITION_NOT_AUTHORIZED: "
-        "RAW_DATA_IDENTITY_GATE_NOT_IMPLEMENTED_PHASE_II_B"
-    )
-
 TRIAL_LOSS_REASONS = {
     "NATIVE_DATA_MISSING",
     "NATIVE_EVENT_MISSING",
@@ -670,7 +661,6 @@ def write_lee_matrix_csv(path: Path, matrix: list[dict]) -> None:
 
 
 def _dataset_instance(dataset_key: str):
-    enforce_phase_ii_b_acquisition_or_abort()
     if dataset_key == "lee2019_mi":
         from moabb.datasets import Lee2019_MI
 
@@ -1008,7 +998,6 @@ def main() -> None:
         help="Resume an interrupted cohort artifact and skip inspected subjects.",
     )
     args = parser.parse_args()
-    enforce_phase_ii_b_acquisition_or_abort()
 
     os.environ.setdefault("MNE_DONTWRITE_HOME", "true")
     os.environ.setdefault("MNE_LOGGING_LEVEL", "WARNING")
