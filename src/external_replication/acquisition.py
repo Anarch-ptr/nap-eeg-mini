@@ -17,7 +17,7 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Callable, Iterable
 
-from .network_policy import DownloadTransport, NetworkPolicy
+from .network_policy import DownloadTransport, NetworkPolicy, TransportResponse
 
 
 MANAGED_CACHE_MARKER = ".phase_ii_b_managed.json"
@@ -120,6 +120,7 @@ def validate_cache_root(
     require_managed: bool = True,
     allow_temporary: bool = False,
     home: str | Path | None = None,
+    allowed_top_level: frozenset[str] = MANAGED_TOP_LEVEL,
 ) -> Path:
     if cache_root is None or not str(cache_root).strip():
         raise AcquisitionError(AcquisitionFailureReason.CACHE_ROOT_REQUIRED)
@@ -153,7 +154,7 @@ def validate_cache_root(
             )
         return root
     names = {child.name for child in root.iterdir()}
-    unexpected = sorted(names - MANAGED_TOP_LEVEL)
+    unexpected = sorted(names - allowed_top_level)
     if unexpected:
         raise AcquisitionError(
             AcquisitionFailureReason.CACHE_ROOT_CONTAINS_UNEXPECTED_FILES,
@@ -190,6 +191,7 @@ def initialize_managed_cache(
     repository_root: str | Path,
     allow_temporary: bool = False,
     home: str | Path | None = None,
+    allowed_top_level: frozenset[str] = MANAGED_TOP_LEVEL,
 ) -> Path:
     root = validate_cache_root(
         cache_root,
@@ -197,6 +199,7 @@ def initialize_managed_cache(
         require_managed=False,
         allow_temporary=allow_temporary,
         home=home,
+        allowed_top_level=allowed_top_level,
     )
     root.mkdir(parents=True, exist_ok=True)
     if any(root.iterdir()):
@@ -251,6 +254,8 @@ def atomic_download(
     transport: DownloadTransport | None,
     expected_length: int | None = None,
     expected_sha256: str | None = None,
+    maximum_length: int | None = None,
+    response_validator: Callable[[TransportResponse], None] | None = None,
 ) -> DownloadReceipt:
     authorized_transport = policy.authorize_transport(transport)
     destination = Path(target)
@@ -269,6 +274,8 @@ def atomic_download(
     created_partial = False
     try:
         response = authorized_transport.open(source_url)
+        if response_validator is not None:
+            response_validator(response)
         if response.status < 200 or response.status >= 300:
             raise AcquisitionError(AcquisitionFailureReason.HTTP_STATUS_ERROR)
         headers = dict(response.headers or {})
@@ -289,6 +296,10 @@ def atomic_download(
                     stream.write(chunk)
                     digest.update(chunk)
                     byte_count += len(chunk)
+                    if maximum_length is not None and byte_count > maximum_length:
+                        raise AcquisitionError(
+                            AcquisitionFailureReason.SINGLE_FILE_SIZE_LIMIT_EXCEEDED
+                        )
             stream.flush()
             os.fsync(stream.fileno())
         if byte_count == 0:

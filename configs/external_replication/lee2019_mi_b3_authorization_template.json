@@ -29,6 +29,10 @@
   ],
   "authorization_mode": "OPAQUE_BYTE_ACQUISITION_ONLY",
   "completion_artifacts": [
+    "collection_plan_identity",
+    "candidate_object_records_in_manifest",
+    "candidate_collection_manifest",
+    "unapproved_candidate_collection_marker",
     "archive_manifest",
     "extracted_raw_file_manifest",
     "opaque_file_inventory",
@@ -99,6 +103,32 @@
       "parsed_trial_counts",
       "data_quality_statistics"
     ]
+  },
+  "multi_object_collection": {
+    "approval_state": "DRAFT_UNAPPROVED",
+    "collection_plan": null,
+    "collection_plan_schema_version": 1,
+    "expected_object_count": 108,
+    "expected_session_count": 2,
+    "expected_subject_count": 54,
+    "extraction_required": false,
+    "object_content_policy": "OPAQUE_BYTES_NO_MATLAB_PARSING",
+    "object_url_plan_review": "PENDING_HUMAN_APPROVAL",
+    "original_representation": "108_INDEPENDENT_OBJECTS",
+    "source_representation": "GIGADB_ORIGINAL_MAT_OBJECTS",
+    "substitution_representations_denied": [
+      "NEMAR_BIDS_DERIVATIVE"
+    ]
+  },
+  "multi_object_resource_limits": {
+    "maximum_bytes_per_object": null,
+    "maximum_concurrent_object_transfers": null,
+    "maximum_redirects_per_object": null,
+    "maximum_relative_path_length": null,
+    "maximum_retry_count": null,
+    "maximum_total_downloaded_bytes": null,
+    "maximum_total_object_count": null,
+    "timeout_seconds": null
   },
   "permitted_operations": [
     "retrieve_from_exact_approved_source",

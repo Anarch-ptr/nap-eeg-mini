@@ -121,3 +121,18 @@ No acquisition import performs network or dataset access.
 
 The real Lee2019_MI raw-data identity state in this phase is `NOT_ACQUIRED`.
 Only a fully controlled synthetic fixture may produce `PASS`.
+
+## B3a multi-object extension
+
+The original GigaDB MI representation is not an archive: it is an exact
+collection of 108 independent opaque MATLAB-named objects (54 subjects by two
+sessions). The archive transaction above remains unchanged for future
+archive-backed datasets. Lee B3a instead uses the separate collection types and
+state machine documented in
+`phase_ii_b_b3a_multi_object_acquisition.md`. It performs no extraction and
+never opens or interprets a `.mat` object.
+
+The B3a implementation is infrastructure only. Its production template has no
+executable object plan, finite real-data resource envelope, automated-download
+permission, approver, or destination TOCTOU approval. Therefore real
+acquisition and all scientific execution remain `DENY`.

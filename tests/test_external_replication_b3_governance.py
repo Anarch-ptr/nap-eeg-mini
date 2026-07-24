@@ -114,6 +114,27 @@ class Lee2019MIB3GovernanceTests(unittest.TestCase):
         self.assertEqual(unresolved["approver"], None)
         self.assertEqual(unresolved["toctou"], "PENDING_HUMAN_APPROVAL")
 
+    def test_b3a_collection_shape_is_declared_but_not_executable(self):
+        collection = self.template["multi_object_collection"]
+        self.assertEqual(
+            collection["source_representation"], "GIGADB_ORIGINAL_MAT_OBJECTS"
+        )
+        self.assertEqual(collection["expected_object_count"], 108)
+        self.assertEqual(collection["expected_subject_count"], 54)
+        self.assertEqual(collection["expected_session_count"], 2)
+        self.assertFalse(collection["extraction_required"])
+        self.assertIsNone(collection["collection_plan"])
+        self.assertEqual(collection["approval_state"], "DRAFT_UNAPPROVED")
+        self.assertIn(
+            "NEMAR_BIDS_DERIVATIVE",
+            collection["substitution_representations_denied"],
+        )
+
+    def test_b3a_real_resource_limits_remain_unresolved(self):
+        limits = self.template["multi_object_resource_limits"]
+        self.assertTrue(limits)
+        self.assertTrue(all(value is None for value in limits.values()))
+
 
 if __name__ == "__main__":
     unittest.main()
