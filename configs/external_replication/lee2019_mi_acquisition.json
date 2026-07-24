@@ -1,0 +1,34 @@
+{
+  "acquisition_authorization_default": "DENY",
+  "acquisition_entry_point": "scripts/acquire_lee2019_mi.py",
+  "archive_identity": {
+    "expected_byte_count": null,
+    "expected_sha256": null,
+    "filename": null,
+    "source_url": null,
+    "status": "SOURCE_IDENTITY_NOT_YET_FROZEN"
+  },
+  "cache_policy": {
+    "explicit_dedicated_root_required": true,
+    "global_mne_cache_allowed": false,
+    "global_moabb_cache_allowed": false,
+    "repository_internal_real_data_allowed": false,
+    "system_temp_persistent_storage_allowed": false
+  },
+  "dataset": {
+    "expected_subject_count": 54,
+    "intended_classes": [
+      "left_motor_imagery",
+      "right_motor_imagery"
+    ],
+    "name": "Lee2019_MI",
+    "online_or_unlabeled_role": "OUTSIDE_AUTHORIZED_SCIENTIFIC_ROLE",
+    "s1_offline_labeled_role": "TRAINING_AND_VALIDATION_SOURCE",
+    "s2_offline_labeled_role": "INDEPENDENT_EVALUATION"
+  },
+  "network_authorization_default": "DENY",
+  "raw_data_identity_gate_real_state": "NOT_ACQUIRED",
+  "schema_version": 1,
+  "scientific_execution_authorization": "DENY",
+  "scientific_execution_may_download": false
+}
