@@ -118,6 +118,49 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(len(self.locked_versions), DEPENDENCY_COUNT)
         self.assertEqual(self.lock.artifact_record_count, DEPENDENCY_COUNT)
 
+    def test_environment_manifest_raw_byte_identity_and_checkout_contract(self):
+        manifest_bytes = PRODUCTION_MANIFEST.read_bytes()
+        lock_bytes = PRODUCTION_LOCK.read_bytes()
+        artifact_bytes = PRODUCTION_ARTIFACTS.read_bytes()
+        attributes = (REPO_ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertEqual(hashlib.sha256(manifest_bytes).hexdigest(), MANIFEST_SHA)
+        self.assertEqual(hashlib.sha256(lock_bytes).hexdigest(), LOCK_SHA)
+        self.assertEqual(hashlib.sha256(artifact_bytes).hexdigest(), ARTIFACT_SHA)
+        for payload in (manifest_bytes, lock_bytes, artifact_bytes):
+            self.assertFalse(payload.startswith(b"\xef\xbb\xbf"))
+            self.assertNotIn(b"\r", payload)
+            self.assertTrue(payload.endswith(b"\n"))
+            self.assertFalse(payload.endswith(b"\n\n"))
+        expected_attributes = {
+            "manifests/external_boundary_replication_environment_v1.json text eol=lf",
+            "manifests/external_boundary_replication_environment_artifacts_v1.json text eol=lf",
+            "requirements/lee2019_mi.lock.txt text eol=lf",
+        }
+        self.assertTrue(expected_attributes.issubset(set(attributes.splitlines())))
+
+    def test_environment_manifest_one_byte_and_wrong_literal_fail_closed(self):
+        root = self.make_repo()
+        manifest = root / ENVIRONMENT_MANIFEST_RELATIVE_PATH
+        manifest.write_bytes(manifest.read_bytes() + b" ")
+        with self.assertRaises(EnvironmentLockIntegrityError) as changed:
+            _read_environment_lock_after_prerequisites(root)
+        self.assertEqual(
+            changed.exception.reason,
+            EnvironmentFailureReason.ENVIRONMENT_MANIFEST_SHA256_MISMATCH,
+        )
+
+        root = self.make_repo()
+        with patch(
+            "src.external_replication.environment.EXPECTED_ENVIRONMENT_MANIFEST_SHA256",
+            "0" * 64,
+        ):
+            with self.assertRaises(EnvironmentLockIntegrityError) as wrong_literal:
+                _read_environment_lock_after_prerequisites(root)
+        self.assertEqual(
+            wrong_literal.exception.reason,
+            EnvironmentFailureReason.ENVIRONMENT_MANIFEST_SHA256_MISMATCH,
+        )
+
     def test_clean_reconstruction_record_is_machine_readable_and_fail_closed(self):
         record = json.loads(RECONSTRUCTION_RECORD.read_bytes())
         self.assertEqual(record["record_trust_role"], "EVIDENCE_ONLY")

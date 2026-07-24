@@ -10,19 +10,21 @@ import shutil
 import stat
 import tarfile
 import tempfile
+import unicodedata
 import zipfile
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
-from typing import Iterable
+from typing import Callable, Iterable
 
 from .network_policy import DownloadTransport, NetworkPolicy
 
 
 MANAGED_CACHE_MARKER = ".phase_ii_b_managed.json"
+COMPLETE_CACHE_MARKER = ".phase_ii_b_complete.json"
 MANAGED_CACHE_SCHEMA = "NAP_EEG_MINI_PHASE_II_B_CACHE_V1"
 MANAGED_TOP_LEVEL = frozenset(
-    {MANAGED_CACHE_MARKER, "archives", "raw", "manifests"}
+    {MANAGED_CACHE_MARKER, COMPLETE_CACHE_MARKER, "archives", "raw", "manifests"}
 )
 
 
@@ -53,6 +55,9 @@ class AcquisitionFailureReason(str, Enum):
     UNSUPPORTED_ARCHIVE = "UNSUPPORTED_ARCHIVE"
     UNSUPPORTED_ARCHIVE_MEMBER = "UNSUPPORTED_ARCHIVE_MEMBER"
     ILLEGAL_FILENAME = "ILLEGAL_FILENAME"
+    ARCHIVE_FILE_COUNT_LIMIT_EXCEEDED = "ARCHIVE_FILE_COUNT_LIMIT_EXCEEDED"
+    SINGLE_FILE_SIZE_LIMIT_EXCEEDED = "SINGLE_FILE_SIZE_LIMIT_EXCEEDED"
+    ARCHIVE_CHANGED_DURING_EXTRACTION = "ARCHIVE_CHANGED_DURING_EXTRACTION"
 
 
 class AcquisitionError(RuntimeError):
@@ -74,6 +79,18 @@ def _canonical(path: str | Path) -> Path:
 
 def _same_path(left: Path, right: Path) -> bool:
     return os.path.normcase(str(left)) == os.path.normcase(str(right))
+
+
+def _is_link_or_junction(path: Path) -> bool:
+    is_junction = getattr(path, "is_junction", None)
+    return path.is_symlink() or bool(is_junction and is_junction())
+
+
+def _has_link_or_junction_ancestor(path: Path) -> bool:
+    return any(
+        ancestor.exists() and _is_link_or_junction(ancestor)
+        for ancestor in (path, *path.parents)
+    )
 
 
 def _inside(path: Path, root: Path) -> bool:
@@ -335,6 +352,7 @@ def _safe_member_path(name: str) -> PurePosixPath:
     if (
         not normalized
         or normalized.startswith(("/", "//"))
+        or "//" in normalized
         or drive
         or name.startswith("\\\\")
     ):
@@ -430,13 +448,15 @@ def _validate_member_set(
     archive_size: int,
     max_total_size: int,
     max_expansion_ratio: float,
+    max_file_count: int,
+    max_single_file_size: int,
 ) -> None:
     exact: set[str] = set()
     folded: set[str] = set()
     total = 0
     for member in members:
         target = member.path.as_posix()
-        folded_target = target.casefold()
+        folded_target = unicodedata.normalize("NFC", target).casefold()
         if target in exact:
             raise AcquisitionError(
                 AcquisitionFailureReason.DUPLICATE_ARCHIVE_TARGET,
@@ -449,7 +469,17 @@ def _validate_member_set(
             )
         exact.add(target)
         folded.add(folded_target)
+        if not member.is_directory and member.size > max_single_file_size:
+            raise AcquisitionError(
+                AcquisitionFailureReason.SINGLE_FILE_SIZE_LIMIT_EXCEEDED,
+                affected_path=target,
+            )
         total += member.size
+    file_count = sum(not member.is_directory for member in members)
+    if file_count > max_file_count:
+        raise AcquisitionError(
+            AcquisitionFailureReason.ARCHIVE_FILE_COUNT_LIMIT_EXCEEDED
+        )
     if total > max_total_size:
         raise AcquisitionError(
             AcquisitionFailureReason.EXTRACTION_SIZE_LIMIT_EXCEEDED
@@ -464,21 +494,47 @@ def safe_extract_archive(
     *,
     max_total_size: int = 10 * 1024 * 1024 * 1024,
     max_expansion_ratio: float = 200.0,
+    max_file_count: int = 100_000,
+    max_single_file_size: int = 2 * 1024 * 1024 * 1024,
+    expected_archive_sha256: str | None = None,
+    pre_publish_validator: (
+        Callable[[Path, tuple[Path, ...]], None] | None
+    ) = None,
 ) -> tuple[Path, ...]:
     source = Path(archive_path)
     target = Path(destination)
-    if target.exists():
+    if _is_link_or_junction(source) or not source.is_file():
+        raise AcquisitionError(
+            AcquisitionFailureReason.SOURCE_IDENTITY_INVALID,
+            affected_path=str(source),
+        )
+    if _has_link_or_junction_ancestor(source.parent):
+        raise AcquisitionError(
+            AcquisitionFailureReason.SOURCE_IDENTITY_INVALID,
+            affected_path=str(source.parent),
+        )
+    if _has_link_or_junction_ancestor(target.parent):
+        raise AcquisitionError(
+            AcquisitionFailureReason.EXTRACTION_TARGET_EXISTS,
+            affected_path=str(target.parent),
+        )
+    if target.exists() or _is_link_or_junction(target):
         raise AcquisitionError(
             AcquisitionFailureReason.EXTRACTION_TARGET_EXISTS,
             affected_path=str(target),
         )
     stage = target.with_name(target.name + ".extracting")
-    if stage.exists():
+    if stage.exists() or _is_link_or_junction(stage):
         raise AcquisitionError(
             AcquisitionFailureReason.EXTRACTION_TARGET_EXISTS,
             affected_path=str(stage),
         )
     archive_size = source.stat().st_size
+    if expected_archive_sha256 is not None:
+        from .raw_manifest import sha256_file
+
+        if sha256_file(source) != expected_archive_sha256.lower():
+            raise AcquisitionError(AcquisitionFailureReason.HASH_MISMATCH)
     stage.mkdir(parents=True)
     created: list[Path] = []
     try:
@@ -490,6 +546,8 @@ def safe_extract_archive(
                     archive_size=archive_size,
                     max_total_size=max_total_size,
                     max_expansion_ratio=max_expansion_ratio,
+                    max_file_count=max_file_count,
+                    max_single_file_size=max_single_file_size,
                 )
                 for member in members:
                     output = stage.joinpath(*member.path.parts)
@@ -508,6 +566,8 @@ def safe_extract_archive(
                     archive_size=archive_size,
                     max_total_size=max_total_size,
                     max_expansion_ratio=max_expansion_ratio,
+                    max_file_count=max_file_count,
+                    max_single_file_size=max_single_file_size,
                 )
                 for member in members:
                     output = stage.joinpath(*member.path.parts)
@@ -526,12 +586,23 @@ def safe_extract_archive(
                     created.append(output)
         else:
             raise AcquisitionError(AcquisitionFailureReason.UNSUPPORTED_ARCHIVE)
+        if expected_archive_sha256 is not None and sha256_file(source) != expected_archive_sha256.lower():
+            raise AcquisitionError(
+                AcquisitionFailureReason.ARCHIVE_CHANGED_DURING_EXTRACTION
+            )
+        staged_files = tuple(
+            sorted(created, key=lambda item: item.as_posix().casefold())
+        )
+        if pre_publish_validator is not None:
+            pre_publish_validator(stage, staged_files)
         stage.rename(target)
         return tuple(
             target / path.relative_to(stage)
-            for path in sorted(created, key=lambda item: item.as_posix().casefold())
+            for path in staged_files
         )
     except Exception:
-        if stage.exists():
+        if _is_link_or_junction(stage):
+            stage.unlink()
+        elif stage.exists():
             shutil.rmtree(stage)
         raise

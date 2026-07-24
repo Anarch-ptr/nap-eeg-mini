@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path, PurePosixPath
@@ -231,6 +232,40 @@ def write_manifest(path: str | Path, manifest: ExtractedManifest) -> None:
         raise ManifestError("MANIFEST_TARGET_EXISTS")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(manifest.to_bytes())
+
+
+def write_manifest_atomic(
+    path: str | Path, manifest: ExtractedManifest
+) -> ExtractedManifest:
+    """Stage, fsync, self-verify, and publish without overwriting."""
+    target = Path(path)
+    staging = target.with_name(target.name + ".staging")
+    if target.exists():
+        raise ManifestError("MANIFEST_TARGET_EXISTS")
+    if staging.exists():
+        raise ManifestError("MANIFEST_STAGING_TARGET_EXISTS")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    frozen = manifest.frozen()
+    created_staging = False
+    try:
+        with staging.open("xb") as stream:
+            created_staging = True
+            stream.write(frozen.to_bytes())
+            stream.flush()
+            os.fsync(stream.fileno())
+        verified = read_manifest(staging)
+        if verified != frozen:
+            raise ManifestError("MANIFEST_STAGING_VERIFICATION_FAILED")
+        os.link(staging, target)
+        staging.unlink()
+        created_staging = False
+        return verified
+    finally:
+        if created_staging:
+            try:
+                staging.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def raw_file_record(

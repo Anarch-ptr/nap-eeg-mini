@@ -17,9 +17,15 @@ if str(REPO_ROOT) not in sys.path:
 from src.external_replication.acquisition import (  # noqa: E402
     AcquisitionError,
     AcquisitionFailureReason,
-    atomic_download,
-    initialize_managed_cache,
-    safe_extract_archive,
+)
+from src.external_replication.acquisition_workflow import (  # noqa: E402
+    AcquisitionDependencies,
+    AcquisitionRequest,
+    AcquisitionWorkflowError,
+    ExpectedRawFile,
+    InventoryExpectation,
+    SourceIdentity,
+    run_acquisition,
 )
 from src.external_replication.network_policy import (  # noqa: E402
     AcquisitionAuthorization,
@@ -32,14 +38,7 @@ from src.external_replication.raw_identity import (  # noqa: E402
     evaluate_raw_identity_gate,
     not_acquired_result,
 )
-from src.external_replication.raw_manifest import (  # noqa: E402
-    ManifestError,
-    ArchiveRecord,
-    ExtractedManifest,
-    raw_file_record,
-    read_manifest,
-    write_manifest,
-)
+from src.external_replication.raw_manifest import ManifestError, read_manifest  # noqa: E402
 
 
 class ExplicitUrllibTransport:
@@ -129,6 +128,11 @@ def build_parser() -> argparse.ArgumentParser:
     acquire.add_argument("--archive-filename", required=True)
     acquire.add_argument("--expected-length", type=int)
     acquire.add_argument("--expected-sha256", required=True)
+    acquire.add_argument(
+        "--inventory-plan",
+        type=Path,
+        help="JSON file containing expected_subject_count and exact raw files",
+    )
     acquire.add_argument("--allow-acquisition", action="store_true")
     acquire.add_argument("--allow-network", action="store_true")
     return parser
@@ -163,89 +167,58 @@ def main(argv: list[str] | None = None) -> int:
             }, sort_keys=True))
             return 0 if command == "print-gate-status" or result.state.value == "PASS" else 2
         if command == "acquire":
-            parsed_source = urlparse(args.source_url)
-            if parsed_source.scheme != "https" or not parsed_source.netloc:
-                raise AcquisitionError(
-                    AcquisitionFailureReason.SOURCE_IDENTITY_INVALID
-                )
-            if (
-                len(args.expected_sha256) != 64
-                or any(character not in "0123456789abcdefABCDEF" for character in args.expected_sha256)
-            ):
-                raise AcquisitionError(
-                    AcquisitionFailureReason.SOURCE_IDENTITY_INVALID
-                )
-            if Path(args.archive_filename).name != args.archive_filename:
-                raise AcquisitionError(
-                    AcquisitionFailureReason.SOURCE_IDENTITY_INVALID
-                )
             policy = NetworkPolicy(authorization=authorization)
-            policy.authorize_acquisition()
-            cache_root = initialize_managed_cache(
-                args.cache_root,
-                repository_root=REPO_ROOT,
-            )
-            policy.authorize_transport(ExplicitUrllibTransport())
-            receipt = atomic_download(
-                source_url=args.source_url,
-                target=cache_root / "archives" / args.archive_filename,
-                policy=policy,
-                transport=ExplicitUrllibTransport(),
-                expected_length=args.expected_length,
-                expected_sha256=args.expected_sha256,
-            )
-            extracted = safe_extract_archive(
-                receipt.target,
-                cache_root / "raw",
-            )
-            timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-            archive_record = ArchiveRecord(
-                schema_version=1,
-                dataset_name="Lee2019_MI",
-                implementation_identifier=None,
-                source_url=receipt.source_url,
-                retrieval_timestamp=timestamp,
-                http_status=receipt.http_status,
-                content_length=receipt.content_length,
-                etag=receipt.etag,
-                last_modified=receipt.last_modified,
-                redirect_chain=receipt.redirect_chain,
-                archive_filename=receipt.target.name,
-                downloaded_byte_count=receipt.downloaded_byte_count,
-                sha256=receipt.sha256,
-                transport_identifier=receipt.transport_identifier,
-            )
-            manifest = ExtractedManifest(
-                schema_version=1,
-                dataset_name="Lee2019_MI",
-                source_archive=archive_record,
-                generated_timestamp=timestamp,
+            # Validate both switches before constructing the only real transport.
+            policy.authorize_network()
+            if args.inventory_plan is None:
+                raise ManifestError("INVENTORY_PLAN_REQUIRED")
+            inventory_payload = json.loads(args.inventory_plan.read_bytes())
+            inventory = InventoryExpectation(
                 files=tuple(
-                    raw_file_record(
-                        path,
-                        relative_to=cache_root / "raw",
-                        source_archive_sha256=receipt.sha256,
-                    )
-                    for path in extracted
+                    ExpectedRawFile(**record)
+                    for record in inventory_payload["files"]
+                ),
+                expected_subject_count=inventory_payload[
+                    "expected_subject_count"
+                ],
+            )
+            request = AcquisitionRequest(
+                cache_root=args.cache_root,
+                repository_root=REPO_ROOT,
+                source=SourceIdentity(
+                    source_url=args.source_url,
+                    archive_filename=args.archive_filename,
+                    expected_size=args.expected_length or 0,
+                    expected_sha256=args.expected_sha256,
+                ),
+                inventory=inventory,
+                authorization=authorization,
+            )
+            result = run_acquisition(
+                request,
+                AcquisitionDependencies(
+                    transport=ExplicitUrllibTransport(),
+                    clock=lambda: datetime.now(timezone.utc),
                 ),
             )
-            manifest_path = cache_root / "manifests" / "raw_manifest.json"
-            write_manifest(manifest_path, manifest)
-            read_manifest(manifest_path)
-            gate_result = evaluate_raw_identity_gate(
-                cache_root,
-                repository_root=REPO_ROOT,
-                expected_subject_count=54,
-            )
-            _print_status(authorization, gate_result.state.value)
+            _print_status(authorization, result.gate_result.state.value)
             print(json.dumps({
-                "archive": receipt.target.name,
-                "byte_count": receipt.downloaded_byte_count,
-                "manifest": manifest_path.name,
-                "sha256": receipt.sha256,
+                "archive": request.source.archive_filename,
+                "manifest_sha256": result.manifest_sha256,
+                "sha256": result.archive_sha256,
+                "state": result.state.value,
             }, sort_keys=True))
-            return 0 if gate_result.state.value == "PASS" else 2
-    except (AcquisitionError, ManifestError, NetworkPolicyError, OSError) as exc:
+            return 0
+    except (
+        AcquisitionError,
+        AcquisitionWorkflowError,
+        ManifestError,
+        NetworkPolicyError,
+        OSError,
+        KeyError,
+        TypeError,
+        json.JSONDecodeError,
+    ) as exc:
         _print_status(authorization, "NOT_ACQUIRED")
         print(f"ERROR={exc}", file=sys.stderr)
         return 2

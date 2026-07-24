@@ -548,6 +548,50 @@ class SafeExtractionTests(PhaseIIBFixture):
         with self.assertRaisesRegex(AcquisitionError, "ILLEGAL_FILENAME"):
             safe_extract_archive(archive, self.make_directory() / "raw")
 
+    def test_repeated_and_mixed_separators_are_rejected(self):
+        for name in ("folder//file.bin", r"folder\\..\\escape.bin"):
+            with self.subTest(name=name):
+                archive = self.write_zip([(name, b"x")])
+                with self.assertRaisesRegex(
+                    AcquisitionError, "UNSAFE_ARCHIVE_PATH"
+                ):
+                    safe_extract_archive(
+                        archive, self.make_directory() / "raw"
+                    )
+
+    def test_unicode_normalization_collision_is_rejected(self):
+        archive = self.write_zip(
+            [("caf\u00e9/a.bin", b"a"), ("cafe\u0301/a.bin", b"b")]
+        )
+        with self.assertRaisesRegex(AcquisitionError, "CASE_COLLISION"):
+            safe_extract_archive(archive, self.make_directory() / "raw")
+
+    def test_file_count_and_single_file_limits(self):
+        archive = self.write_zip([("a.bin", b"a"), ("b.bin", b"bb")])
+        with self.assertRaisesRegex(
+            AcquisitionError, "ARCHIVE_FILE_COUNT_LIMIT_EXCEEDED"
+        ):
+            safe_extract_archive(
+                archive, self.make_directory() / "count", max_file_count=1
+            )
+        with self.assertRaisesRegex(
+            AcquisitionError, "SINGLE_FILE_SIZE_LIMIT_EXCEEDED"
+        ):
+            safe_extract_archive(
+                archive,
+                self.make_directory() / "size",
+                max_single_file_size=1,
+            )
+
+    def test_archive_hash_is_verified_before_extraction(self):
+        archive = self.write_zip([("a.bin", b"a")])
+        with self.assertRaisesRegex(AcquisitionError, "HASH_MISMATCH"):
+            safe_extract_archive(
+                archive,
+                self.make_directory() / "raw",
+                expected_archive_sha256="0" * 64,
+            )
+
 
 class CacheAndGateTests(PhaseIIBFixture):
     def test_10_11_synthetic_gate_pass_and_repeated_frozen_verification(self):

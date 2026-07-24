@@ -80,10 +80,14 @@ class NetworkPolicy:
                 NetworkFailureReason.ACQUISITION_NOT_AUTHORIZED
             )
 
-    def authorize_transport(self, transport: DownloadTransport | None) -> DownloadTransport:
+    def authorize_network(self) -> None:
+        """Validate both switches without requiring or constructing a transport."""
         self.authorize_acquisition()
         if self.authorization.network is not AuthorizationState.ALLOW:
             raise NetworkPolicyError(NetworkFailureReason.NETWORK_NOT_AUTHORIZED)
+
+    def authorize_transport(self, transport: DownloadTransport | None) -> DownloadTransport:
+        self.authorize_network()
         if transport is None:
             raise NetworkPolicyError(NetworkFailureReason.TRANSPORT_NOT_CONFIGURED)
         return transport
