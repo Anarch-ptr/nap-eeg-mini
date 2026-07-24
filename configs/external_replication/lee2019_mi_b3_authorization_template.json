@@ -29,6 +29,10 @@
   ],
   "authorization_mode": "OPAQUE_BYTE_ACQUISITION_ONLY",
   "completion_artifacts": [
+    "collection_plan_identity",
+    "candidate_object_records_in_manifest",
+    "candidate_collection_manifest",
+    "unapproved_candidate_collection_marker",
     "archive_manifest",
     "extracted_raw_file_manifest",
     "opaque_file_inventory",
@@ -39,29 +43,39 @@
   ],
   "dataset": {
     "dataset_id": "Lee2019_MI",
+    "data_doi": "10.5524/100542",
+    "paper_doi": "10.1093/gigascience/giz002",
+    "release_date": "2019-01-24",
     "release_or_version": null,
-    "release_or_version_required_for_authorization": true
+    "release_or_version_required_for_authorization": true,
+    "release_or_version_status": "UNKNOWN"
   },
   "default": "DENY",
   "destination": {
-    "dedicated_cache_root": null,
+    "basic_review_status": "PASS_CURRENT_BASIC_CHECKS",
+    "dedicated_cache_root": "E:\\nap-eeg-mini-data\\lee2019_mi",
     "must_be_local": true,
     "must_be_outside_repository": true,
     "must_not_be_junctioned": true,
     "must_not_be_network_or_shared_storage": true,
     "must_not_be_symlinked": true,
-    "must_not_be_untrusted_user_writable": true
+    "must_not_be_untrusted_user_writable": true,
+    "safe_extraction_toctou_approval": "PENDING_HUMAN_APPROVAL"
   },
   "license_and_terms": {
-    "approval_status": "UNVERIFIED_DENY",
+    "approval_status": "DATA_LICENSE_VERIFIED_AUTOMATION_UNVERIFIED_DENY",
+    "attribution_requirements": "EXPECTED_SCIENTIFIC_ETIQUETTE",
     "automated_download_permission": "UNVERIFIED",
-    "citation_requirements": "UNVERIFIED",
-    "credential_requirements": "UNVERIFIED",
-    "license_identifier": null,
-    "redistribution_permission": "NOT_ASSUMED",
-    "research_use_permission": "UNVERIFIED",
-    "source_terms_record": null,
-    "source_terms_url": null
+    "citation_requirements": "EXPECTED_NOT_LEGALLY_REQUIRED_BY_CC0",
+    "commercial_use_permission": "PERMITTED",
+    "credential_requirements": "NOT_REQUIRED_FOR_PUBLIC_LANDING_AND_LINK_DISCOVERY",
+    "derivatives_permission": "PERMITTED",
+    "license_identifier": "CC0-1.0",
+    "license_scope": "GIGADB_DATASET_ASSOCIATED_WITH_GIGASCIENCE_ARTICLE",
+    "redistribution_permission": "PERMITTED",
+    "research_use_permission": "PERMITTED",
+    "source_terms_record": "B3-GIGADB-TERMS",
+    "source_terms_url": "https://gigadb.org/term"
   },
   "metadata_policy": {
     "allowed": [
@@ -89,6 +103,32 @@
       "parsed_trial_counts",
       "data_quality_statistics"
     ]
+  },
+  "multi_object_collection": {
+    "approval_state": "DRAFT_UNAPPROVED",
+    "collection_plan": null,
+    "collection_plan_schema_version": 1,
+    "expected_object_count": 108,
+    "expected_session_count": 2,
+    "expected_subject_count": 54,
+    "extraction_required": false,
+    "object_content_policy": "OPAQUE_BYTES_NO_MATLAB_PARSING",
+    "object_url_plan_review": "PENDING_HUMAN_APPROVAL",
+    "original_representation": "108_INDEPENDENT_OBJECTS",
+    "source_representation": "GIGADB_ORIGINAL_MAT_OBJECTS",
+    "substitution_representations_denied": [
+      "NEMAR_BIDS_DERIVATIVE"
+    ]
+  },
+  "multi_object_resource_limits": {
+    "maximum_bytes_per_object": null,
+    "maximum_concurrent_object_transfers": null,
+    "maximum_redirects_per_object": null,
+    "maximum_relative_path_length": null,
+    "maximum_retry_count": null,
+    "maximum_total_downloaded_bytes": null,
+    "maximum_total_object_count": null,
+    "timeout_seconds": null
   },
   "permitted_operations": [
     "retrieve_from_exact_approved_source",
@@ -139,6 +179,20 @@
     "redirect_limit": null,
     "timeout_seconds": null
   },
+  "review_status": {
+    "b3_preauthorization": "BLOCKED_UNRESOLVED",
+    "blocking_gaps": [
+      "exact_approved_source_variant",
+      "upstream_release_or_version",
+      "automated_download_permission",
+      "official_cryptographic_identity",
+      "finite_nonnull_resource_limits",
+      "named_human_approver",
+      "safe_extraction_toctou_approval"
+    ],
+    "real_data_acquisition_authorization": "DENY",
+    "scientific_execution_authorization": "DENY"
+  },
   "schema_version": 1,
   "scientific_capabilities": {
     "evaluation": "DENY",
@@ -150,24 +204,35 @@
     "visualization": "DENY"
   },
   "source": {
-    "approved_host": null,
-    "approved_path_or_pattern": null,
+    "approved_host": "s3.ap-northeast-1.wasabisys.com",
+    "approved_path_or_pattern": "/gigadb-datasets/live/pub/10.5524/100001_101000/100542/session1/s{1..54}/sess01_subj{01..54}_EEG_MI.mat OR /gigadb-datasets/live/pub/10.5524/100001_101000/100542/session2/s{1..54}/sess02_subj{01..54}_EEG_MI.mat",
     "approved_scheme": "https",
-    "authenticity_evidence": null,
+    "authenticity_evidence": "B3-GIGADB-RECORD_AND-MOABB-SOURCE",
+    "expected_file_count": 108,
+    "file_structure": "INDEPENDENT_PER_SUBJECT_PER_SESSION",
     "filename": null,
-    "first_acquisition_identity_policy": null,
+    "filename_pattern": "sess{01|02}_subj{01..54}_EEG_MI.mat",
+    "first_acquisition_identity_policy": "QUARANTINE_THEN_HUMAN_APPROVAL",
     "hash_approval_source": null,
     "no_http_downgrade": true,
     "query_policy": "NO_QUERY_UNLESS_EXPLICITLY_APPROVED",
-    "redirect_policy": null,
+    "redirect_policy": "NO_REDIRECT_UNLESS_SEPARATELY_REVIEWED_AND_EXACTLY_APPROVED",
     "sha256": null,
     "size_bytes": null,
+    "source_selection_status": "CANDIDATE_NOT_AUTHORIZED",
     "wildcard_host_allowed": false
   },
   "source_authenticity": {
-    "evidence_record": null,
+    "evidence_record": "docs/external_replication/phase_ii_b_b3_source_license_review.md",
     "required_class": "OFFICIAL_OR_INDEPENDENTLY_VERIFIED_MIRROR",
-    "status": "UNVERIFIED_DENY"
+    "status": "VERIFIED_OFFICIAL_DENY_PENDING_OTHER_GATES"
+  },
+  "source_change_policy": {
+    "different_url_same_hash": "SOURCE_MIGRATION_CANDIDATE_REVIEW_REQUIRED",
+    "no_official_version": "PROJECT_LOCAL_IMMUTABLE_ACQUISITION_IDENTITY_REQUIRED",
+    "same_filename_different_size": "FAIL_CLOSED",
+    "same_url_different_hash": "SOURCE_IDENTITY_CHANGED_QUARANTINE_AND_REREVIEW",
+    "silent_authorization_update": "PROHIBITED"
   },
   "stop_conditions": [
     "source_identity_ambiguous",

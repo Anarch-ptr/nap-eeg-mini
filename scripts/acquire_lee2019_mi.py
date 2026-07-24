@@ -34,6 +34,9 @@ from src.external_replication.network_policy import (  # noqa: E402
     NetworkPolicyError,
     TransportResponse,
 )
+from src.external_replication.multi_object_acquisition import (  # noqa: E402
+    GIGADB_ORIGINAL_MAT_OBJECTS,
+)
 from src.external_replication.raw_identity import (  # noqa: E402
     evaluate_raw_identity_gate,
     not_acquired_result,
@@ -96,12 +99,46 @@ def _print_status(
     )
 
 
+def _print_collection_status(
+    authorization: AcquisitionAuthorization,
+    gate_state: str = "NOT_ACQUIRED",
+) -> None:
+    print("DATA_ACCESS=NONE")
+    print(f"NETWORK_AUTHORIZATION={authorization.network.value}")
+    print(f"ACQUISITION_AUTHORIZATION={authorization.acquisition.value}")
+    print(f"SOURCE_REPRESENTATION={GIGADB_ORIGINAL_MAT_OBJECTS}")
+    print("EXPECTED_OBJECT_COUNT=108")
+    print(f"CANDIDATE_COLLECTION_GATE={gate_state}")
+    print("HUMAN_APPROVAL_STATE=PENDING_HUMAN_APPROVAL")
+    print("SCIENTIFIC_EXECUTION_AUTHORIZATION=DENY")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Fail-closed Lee2019_MI Phase II-B acquisition foundation"
     )
     subparsers = parser.add_subparsers(dest="command")
     subparsers.add_parser("plan", help="describe the offline acquisition plan")
+    subparsers.add_parser(
+        "plan-collection",
+        help="describe the offline, non-executable 108-object collection plan",
+    )
+    verify_collection = subparsers.add_parser(
+        "verify-candidate-collection",
+        help="offline collection verification skeleton; real plan remains unapproved",
+    )
+    verify_collection.add_argument("--cache-root", type=Path)
+    collection_gate = subparsers.add_parser(
+        "print-collection-gate-status",
+        help="print the fail-closed collection gate without network access",
+    )
+    collection_gate.add_argument("--cache-root", type=Path)
+    acquire_collection = subparsers.add_parser(
+        "acquire-collection",
+        help="refuse real collection acquisition while B3 approvals are unresolved",
+    )
+    acquire_collection.add_argument("--allow-acquisition", action="store_true")
+    acquire_collection.add_argument("--allow-network", action="store_true")
 
     manifest = subparsers.add_parser(
         "verify-manifest", help="verify deterministic manifest self-identity"
@@ -149,6 +186,23 @@ def main(argv: list[str] | None = None) -> int:
             print("PLAN=DOWNLOAD_VERIFY_EXTRACT_INVENTORY_MANIFEST_GATE")
             print("PLAN_WRITES_DATA=NO")
             return 0
+        if command == "plan-collection":
+            _print_collection_status(authorization)
+            print("PLAN=VALIDATE_LOCK_STAGE_VERIFY_PUBLISH_MANIFEST_QUARANTINE")
+            print("PLAN_WRITES_DATA=NO")
+            print("CONCURRENCY_MODEL=SINGLE_COLLECTION_SINGLE_PROCESS")
+            return 0
+        if command in {
+            "verify-candidate-collection",
+            "print-collection-gate-status",
+        }:
+            _print_collection_status(authorization)
+            print("REAL_COLLECTION_PLAN=UNAPPROVED")
+            return 0 if command == "print-collection-gate-status" else 2
+        if command == "acquire-collection":
+            _print_collection_status(authorization)
+            print("ERROR=REAL_COLLECTION_AUTHORIZATION_UNAVAILABLE", file=sys.stderr)
+            return 2
         if command == "verify-manifest":
             manifest = read_manifest(args.manifest)
             _print_status(authorization, "NOT_ACQUIRED")
