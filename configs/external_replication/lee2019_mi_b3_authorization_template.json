@@ -1,0 +1,190 @@
+{
+  "authorization_identity": {
+    "approval_reference": null,
+    "approver": null,
+    "authorization_id": null,
+    "bindings": {
+      "dataset_id": "Lee2019_MI",
+      "destination_identity": "REQUIRED_EXACT",
+      "operation_capabilities": "OPAQUE_BYTE_ACQUISITION_ONLY",
+      "scientific_flags": "ALL_DENY",
+      "source_identity": "REQUIRED_EXACT"
+    },
+    "expiration": null,
+    "issue_time": null,
+    "status": "DRAFT_DENY"
+  },
+  "authorization_preconditions": [
+    "named_human_approver",
+    "nonexpired_authorization_identity",
+    "exact_dataset_release_or_version",
+    "exact_source_identity",
+    "approved_source_authenticity_evidence",
+    "approved_license_and_terms_record",
+    "approved_archive_identity_policy",
+    "exact_local_destination_identity",
+    "finite_nonnull_resource_limits",
+    "safe_extraction_risk_acceptance_for_destination",
+    "all_scientific_capabilities_deny"
+  ],
+  "authorization_mode": "OPAQUE_BYTE_ACQUISITION_ONLY",
+  "completion_artifacts": [
+    "archive_manifest",
+    "extracted_raw_file_manifest",
+    "opaque_file_inventory",
+    "authorization_record",
+    "acquisition_log",
+    "completion_marker",
+    "raw_identity_gate_result"
+  ],
+  "dataset": {
+    "dataset_id": "Lee2019_MI",
+    "release_or_version": null,
+    "release_or_version_required_for_authorization": true
+  },
+  "default": "DENY",
+  "destination": {
+    "dedicated_cache_root": null,
+    "must_be_local": true,
+    "must_be_outside_repository": true,
+    "must_not_be_junctioned": true,
+    "must_not_be_network_or_shared_storage": true,
+    "must_not_be_symlinked": true,
+    "must_not_be_untrusted_user_writable": true
+  },
+  "license_and_terms": {
+    "approval_status": "UNVERIFIED_DENY",
+    "automated_download_permission": "UNVERIFIED",
+    "citation_requirements": "UNVERIFIED",
+    "credential_requirements": "UNVERIFIED",
+    "license_identifier": null,
+    "redistribution_permission": "NOT_ASSUMED",
+    "research_use_permission": "UNVERIFIED",
+    "source_terms_record": null,
+    "source_terms_url": null
+  },
+  "metadata_policy": {
+    "allowed": [
+      "response_status",
+      "content_type",
+      "content_length",
+      "etag",
+      "last_modified",
+      "redirect_chain",
+      "filename",
+      "relative_path",
+      "byte_size",
+      "sha256",
+      "retrieval_time",
+      "archive_member_type_for_safe_extraction"
+    ],
+    "disallowed": [
+      "labels",
+      "class_counts",
+      "subject_attributes",
+      "signal_shape",
+      "sampling_frequency",
+      "channel_names",
+      "event_codes",
+      "parsed_trial_counts",
+      "data_quality_statistics"
+    ]
+  },
+  "permitted_operations": [
+    "retrieve_from_exact_approved_source",
+    "write_owned_partial_file",
+    "count_archive_bytes",
+    "calculate_archive_sha256",
+    "safe_extract_opaque_members",
+    "inventory_relative_paths",
+    "count_extracted_file_bytes",
+    "calculate_extracted_file_sha256",
+    "generate_acquisition_audit_log",
+    "generate_identity_manifests",
+    "verify_raw_identity_gate"
+  ],
+  "post_acquisition_scientific_execution_authorization": "DENY",
+  "prohibited_operations": [
+    "scientific_file_format_parsing",
+    "matlab_array_loading",
+    "eeg_container_parsing",
+    "subject_metadata_parsing",
+    "session_metadata_parsing_beyond_declared_paths",
+    "label_parsing",
+    "channel_parsing",
+    "sampling_rate_parsing",
+    "event_parsing",
+    "trial_parsing",
+    "signal_loading",
+    "signal_statistics",
+    "quality_metrics",
+    "visualization",
+    "preprocessing",
+    "filtering",
+    "resampling",
+    "covariance",
+    "feature_extraction",
+    "training",
+    "evaluation",
+    "model_selection",
+    "scientific_metrics",
+    "online_or_unlabeled_scientific_inspection"
+  ],
+  "resource_limits": {
+    "maximum_archive_bytes": null,
+    "maximum_compression_ratio": null,
+    "maximum_extracted_bytes": null,
+    "maximum_member_count": null,
+    "maximum_single_file_bytes": null,
+    "redirect_limit": null,
+    "timeout_seconds": null
+  },
+  "schema_version": 1,
+  "scientific_capabilities": {
+    "evaluation": "DENY",
+    "metrics": "DENY",
+    "parsing": "DENY",
+    "preprocessing": "DENY",
+    "training": "DENY",
+    "trial_construction": "DENY",
+    "visualization": "DENY"
+  },
+  "source": {
+    "approved_host": null,
+    "approved_path_or_pattern": null,
+    "approved_scheme": "https",
+    "authenticity_evidence": null,
+    "filename": null,
+    "first_acquisition_identity_policy": null,
+    "hash_approval_source": null,
+    "no_http_downgrade": true,
+    "query_policy": "NO_QUERY_UNLESS_EXPLICITLY_APPROVED",
+    "redirect_policy": null,
+    "sha256": null,
+    "size_bytes": null,
+    "wildcard_host_allowed": false
+  },
+  "source_authenticity": {
+    "evidence_record": null,
+    "required_class": "OFFICIAL_OR_INDEPENDENTLY_VERIFIED_MIRROR",
+    "status": "UNVERIFIED_DENY"
+  },
+  "stop_conditions": [
+    "source_identity_ambiguous",
+    "redirect_outside_approved_scope",
+    "license_or_terms_not_approved",
+    "dataset_version_missing",
+    "hash_policy_missing_or_ambiguous",
+    "resource_limit_exceeded",
+    "cache_root_policy_failure",
+    "unknown_preexisting_content",
+    "archive_validation_failure",
+    "extraction_failure",
+    "manifest_failure",
+    "raw_identity_gate_failure",
+    "scientific_parser_import_or_invocation",
+    "scientific_metadata_computation_attempt",
+    "safe_extraction_risk_not_approved_for_destination"
+  ],
+  "template_status": "DRAFT_ONLY"
+}
